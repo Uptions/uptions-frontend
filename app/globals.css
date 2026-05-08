@@ -5,8 +5,20 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: var(--font-sans);
-    --font-sans: var(--font-sans);
+    /* Typography: Outfit (body) + Space Grotesk (headings) — see layout.tsx */
+    --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+    --font-heading: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+    --font-poppins: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+    --font-mono: var(--font-mono), ui-monospace, monospace;
+
+    /* Brand palette (Figma) — use bg-brand-primary, text-brand-secondary, etc. */
+    --color-brand-primary: var(--brand-primary);
+    --color-brand-secondary: var(--brand-secondary);
+    --color-brand-secondary-muted: var(--brand-secondary-muted);
+    --color-brand-foreground: var(--brand-foreground);
+    --color-brand-surface: var(--brand-surface);
+    --color-brand-black: var(--brand-black);
+    --color-brand-white: var(--brand-white);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -47,25 +59,102 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Keep keyframes outside @layer so the marquee animation reliably ships with Tailwind v4 */
+@keyframes footer-tagline-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes highway-vehicle-ltr {
+  0% {
+    transform: translate3d(-18vw, 0, 0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(118vw, 0, 0);
+    opacity: 0;
+  }
+}
+
+@keyframes highway-vehicle-rtl {
+  0% {
+    transform: translate3d(18vw, 0, 0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(-118vw, 0, 0);
+    opacity: 0;
+  }
+}
+
+@keyframes hero-content-swap {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
+    /*
+     * Uptions — brand tokens (Figma “Selection colors” / brand board)
+     * ------------------------------------------------------------------
+     * primary (navy)     #001B6C
+     * secondary (blue)   #007BFF
+     * secondary @ 15%   use for soft fills / hovers (mixed with white)
+     * foreground (text)  #1E1E1E
+     * surface (grey)     #E9E9E9 — section backgrounds, dividers
+     * white / black      #FFFFFF / #000000
+     * accent gradient    bright blue → cyan (hero buttons, highlights)
+     */
+    --brand-white: #ffffff;
+    --brand-black: #000000;
+    --brand-primary: #001b6c;
+    --brand-secondary: #007bff;
+    --brand-secondary-muted: color-mix(in srgb, var(--brand-secondary) 15%, var(--brand-white));
+    --brand-foreground: #1e1e1e;
+    --brand-surface: #e9e9e9;
+    --brand-gradient-start: #007bff;
+    --brand-gradient-end: #00c8ff;
+
+    /* shadcn semantic mapping (light) — aligned to brand */
+    --background: var(--brand-white);
+    --foreground: var(--brand-foreground);
+    --card: var(--brand-white);
+    --card-foreground: var(--brand-foreground);
+    --popover: var(--brand-white);
+    --popover-foreground: var(--brand-foreground);
+    --primary: var(--brand-primary);
+    --primary-foreground: var(--brand-white);
+    --secondary: var(--brand-surface);
+    --secondary-foreground: var(--brand-primary);
+    --muted: var(--brand-surface);
+    --muted-foreground: color-mix(in srgb, var(--brand-foreground) 65%, var(--brand-white));
+    --accent: var(--brand-secondary-muted);
+    --accent-foreground: var(--brand-primary);
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
+    --border: color-mix(in srgb, var(--brand-foreground) 10%, var(--brand-white));
+    --input: color-mix(in srgb, var(--brand-foreground) 12%, var(--brand-white));
+    --ring: var(--brand-secondary);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -83,24 +172,25 @@
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
+    /* Dark UI: navy shell, bright blue accents (on-brand) */
+    --background: color-mix(in srgb, var(--brand-primary) 35%, var(--brand-black));
+    --foreground: var(--brand-white);
+    --card: color-mix(in srgb, var(--brand-primary) 50%, var(--brand-black));
+    --card-foreground: var(--brand-white);
+    --popover: color-mix(in srgb, var(--brand-primary) 50%, var(--brand-black));
+    --popover-foreground: var(--brand-white);
+    --primary: var(--brand-secondary);
+    --primary-foreground: var(--brand-white);
+    --secondary: color-mix(in srgb, var(--brand-white) 12%, transparent);
+    --secondary-foreground: var(--brand-white);
+    --muted: color-mix(in srgb, var(--brand-white) 10%, transparent);
+    --muted-foreground: color-mix(in srgb, var(--brand-white) 72%, var(--brand-primary));
+    --accent: color-mix(in srgb, var(--brand-secondary) 22%, transparent);
+    --accent-foreground: var(--brand-white);
     --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    --border: color-mix(in srgb, var(--brand-white) 14%, transparent);
+    --input: color-mix(in srgb, var(--brand-white) 18%, transparent);
+    --ring: var(--brand-secondary);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -123,7 +213,76 @@
   body {
     @apply bg-background text-foreground;
     }
+  a,
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  label[for],
+  select {
+    cursor: url("/location-cursor.svg") 16 28, pointer;
+  }
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  [contenteditable="true"] {
+    cursor: text;
+  }
+  /* Site-wide location-pin cursor (hotspot ~ tip of pin); inherit on plain content */
   html {
     @apply font-sans;
+    cursor: url("/location-cursor.svg") 16 28, auto;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-heading tracking-tight;
     }
+}
+
+@layer utilities {
+  .bg-brand-gradient {
+    background-image: linear-gradient(
+      135deg,
+      var(--brand-gradient-start),
+      var(--brand-gradient-end)
+    );
+  }
+
+  .animate-footer-tagline-marquee {
+    animation: footer-tagline-marquee 14s linear infinite;
+    will-change: transform;
+  }
+
+  .animate-highway-vehicle-ltr {
+    animation: highway-vehicle-ltr 11s linear infinite;
+    will-change: transform;
+  }
+
+  .animate-highway-vehicle-rtl {
+    animation: highway-vehicle-rtl 12s linear infinite;
+    will-change: transform;
+  }
+
+  .animate-hero-content-swap {
+    animation: hero-content-swap 380ms ease-out both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-footer-tagline-marquee {
+      animation: none;
+    }
+    .animate-highway-vehicle-ltr,
+    .animate-highway-vehicle-rtl {
+      animation: none;
+    }
+    .animate-hero-content-swap {
+      animation: none;
+    }
+  }
 }
