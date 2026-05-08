@@ -16,6 +16,9 @@ export default async function CheckoutPaymentPage() {
   if (!flow.paymentExpiresAt) {
     redirect("/checkout")
   }
+  if (!flow.transferDetails) {
+    redirect("/checkout")
+  }
 
   return (
     <div
@@ -32,7 +35,9 @@ export default async function CheckoutPaymentPage() {
           tryUptionsHref="/find-an-uption"
         />
         <BankTransferPanel
-          totalNaira={flow.totalNaira}
+          amountNaira={flow.transferDetails.amountNaira}
+          bankName={flow.transferDetails.bankName}
+          accountNumber={flow.transferDetails.accountNumber}
           expiresAt={flow.paymentExpiresAt}
         />
         <Footer />

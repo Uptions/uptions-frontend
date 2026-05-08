@@ -5,6 +5,8 @@ import type { DeliveryQuoteRequest, DeliveryQuoteResponse } from "@/lib/delivery
  * Lost on server restart / serverless cold start — replace with DB or backend session.
  */
 export type CheckoutFlowState = {
+  orderId: string
+  orderSessionId: string
   request: DeliveryQuoteRequest
   quote: DeliveryQuoteResponse
   selectedCourierId: string | null
@@ -17,15 +19,24 @@ export type CheckoutFlowState = {
   paymentExpiresAt: number | null
   /** Deadline for admin to confirm payment (after “I’ve sent the money”) */
   paymentConfirmationWaitExpiresAt: number | null
+  transferDetails: {
+    bankName: string
+    accountNumber: string
+    amountNaira: number
+  } | null
 }
 
 const flows = new Map<string, CheckoutFlowState>()
 
 export function createFlowState(
+  orderId: string,
+  orderSessionId: string,
   request: DeliveryQuoteRequest,
   quote: DeliveryQuoteResponse,
 ): CheckoutFlowState {
   return {
+    orderId,
+    orderSessionId,
     request,
     quote,
     selectedCourierId: null,
@@ -35,6 +46,7 @@ export function createFlowState(
     totalNaira: request.package.valueNaira + 500,
     paymentExpiresAt: null,
     paymentConfirmationWaitExpiresAt: null,
+    transferDetails: null,
   }
 }
 

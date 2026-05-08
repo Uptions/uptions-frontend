@@ -1,0 +1,165 @@
+"use client"
+
+import { Eye, MapPin } from "lucide-react"
+import Link from "next/link"
+
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { cn } from "@/lib/utils"
+
+const inputClassName =
+  "h-12 rounded-lg border-brand-secondary/70 bg-[#EEF2F6] text-brand-foreground placeholder:text-brand-foreground/50 focus-visible:border-brand-secondary focus-visible:ring-2 focus-visible:ring-brand-secondary/25"
+
+function GoogleIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="size-5"
+      aria-hidden
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M21.805 10.023H12v3.955h5.614c-.242 1.274-.969 2.354-2.06 3.08v2.56h3.33c1.95-1.796 3.075-4.444 3.075-7.594 0-.676-.06-1.326-.174-2Z"
+        fill="#4285F4"
+      />
+      <path
+        d="M12 22c2.79 0 5.13-.924 6.84-2.5l-3.33-2.56c-.923.62-2.106.987-3.51.987-2.699 0-4.983-1.822-5.8-4.274H2.757v2.64A10.334 10.334 0 0 0 12 22Z"
+        fill="#34A853"
+      />
+      <path
+        d="M6.2 13.653A6.214 6.214 0 0 1 5.876 12c0-.574.117-1.127.324-1.653v-2.64H2.757A10.334 10.334 0 0 0 1.666 12c0 1.652.397 3.217 1.091 4.293l3.443-2.64Z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M12 6.073c1.518 0 2.88.523 3.95 1.55l2.963-2.964C17.126 2.997 14.786 2 12 2A10.334 10.334 0 0 0 2.757 7.707l3.443 2.64c.817-2.452 3.101-4.274 5.8-4.274Z"
+        fill="#EA4335"
+      />
+    </svg>
+  )
+}
+
+export default function BusinessSignUpPage() {
+  return (
+    <div
+      className="relative min-h-svh w-full bg-transparent bg-[url('/layer.svg')] bg-top bg-no-repeat [background-size:100%_auto]"
+      data-landing-root
+    >
+      <main className="relative z-10 w-full bg-transparent" aria-label="Business sign up">
+        <header className="px-4 pt-6 md:px-6 md:pt-8">
+          <div className="mx-auto flex w-full max-w-4xl items-center justify-between rounded-full bg-[linear-gradient(90deg,rgba(255,255,255,0.86)_0%,rgba(236,246,255,0.86)_42%,rgba(218,236,253,0.8)_100%)] px-3 py-2 shadow-[0_4px_28px_-6px_rgba(0,27,108,0.1),0_2px_10px_-4px_rgba(0,123,255,0.07)] backdrop-blur-md backdrop-saturate-150 md:px-5 md:py-2.5">
+            <Link
+              href="/#why-us"
+              className="inline-flex items-center gap-2 rounded-full px-2 py-1"
+              aria-label="Uptions home"
+            >
+              <span className="inline-flex size-8 items-center justify-center rounded-lg bg-brand-secondary text-brand-white">
+                <MapPin className="size-4" />
+              </span>
+              <span className="text-3xl font-bold leading-none text-brand-primary">Uptions</span>
+            </Link>
+
+            <a
+              href="mailto:support@uptions.com"
+              className="inline-flex h-9 items-center justify-center rounded-full bg-brand-secondary px-5 text-sm font-medium text-brand-white transition-colors hover:bg-brand-secondary/90"
+            >
+              Contact support
+            </a>
+          </div>
+        </header>
+
+        <section className="mx-auto flex w-full max-w-4xl justify-center px-4 pb-20 pt-10 md:px-6 md:pt-14">
+          <div className="w-full max-w-lg rounded-2xl bg-transparent p-3 md:p-4">
+            <h1 className="text-center text-4xl font-bold tracking-tight text-brand-primary md:text-5xl">
+              Create <span className="text-brand-foreground">your account.</span>
+            </h1>
+            <p className="mt-3 text-center text-base text-brand-foreground">
+              Hello welcome, Let&apos;s help you get started.
+            </p>
+
+            <form className="mt-8 space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="business-signup-email" className="text-brand-foreground">
+                  Email
+                </Label>
+                <Input
+                  id="business-signup-email"
+                  type="email"
+                  placeholder="Enter your email"
+                  className={inputClassName}
+                  autoComplete="email"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="business-signup-password" className="text-brand-foreground">
+                  Password
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="business-signup-password"
+                    type="password"
+                    placeholder="Enter Password"
+                    className={cn(inputClassName, "pr-10")}
+                    autoComplete="new-password"
+                  />
+                  <Eye
+                    className="pointer-events-none absolute right-3 top-1/2 size-5 -translate-y-1/2 text-brand-secondary"
+                    aria-hidden
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="business-signup-confirm" className="text-brand-foreground">
+                  Confirm Password
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="business-signup-confirm"
+                    type="password"
+                    placeholder="Enter Password"
+                    className={cn(inputClassName, "pr-10")}
+                    autoComplete="new-password"
+                  />
+                  <Eye
+                    className="pointer-events-none absolute right-3 top-1/2 size-5 -translate-y-1/2 text-brand-secondary"
+                    aria-hidden
+                  />
+                </div>
+              </div>
+
+              <Link
+                href="/business/auth/signup/form"
+                className="inline-flex h-12 w-full items-center justify-center rounded-lg bg-brand-secondary px-6 font-poppins text-base font-semibold text-brand-white transition-colors hover:bg-brand-secondary/90"
+              >
+                Sign Up
+              </Link>
+
+              <button
+                type="button"
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#D1D5DB] px-6 font-poppins text-base font-semibold text-brand-foreground transition-colors hover:bg-[#c5cbd6]"
+              >
+                <GoogleIcon />
+                Sign Up with Google
+              </button>
+            </form>
+
+            <div className="mt-6 text-center text-sm">
+              <p className="text-brand-foreground/80">
+                Already have an account?{" "}
+                <Link
+                  href="/business/auth"
+                  className="font-semibold text-brand-secondary hover:underline"
+                >
+                  Sign In
+                </Link>
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  )
+}
+

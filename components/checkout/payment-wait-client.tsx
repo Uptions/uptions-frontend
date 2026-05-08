@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { MapPin, Minus } from "lucide-react"
 
 import { usePaymentConfirmationSocket } from "@/hooks/use-payment-confirmation-socket"
+import { getBackendBaseUrl } from "@/lib/backend-base-url"
 import {
   readPaymentSuccess,
   readPaymentWait,
@@ -22,9 +23,11 @@ function formatMmSs(totalSeconds: number): string {
 
 export function PaymentWaitClient({
   sessionId,
+  orderId,
   serverWaitExpiresAt,
 }: {
   sessionId: string
+  orderId: string
   serverWaitExpiresAt: number | null
 }) {
   const router = useRouter()
@@ -33,6 +36,8 @@ export function PaymentWaitClient({
   const [successData, setSuccessData] = React.useState<PaymentSuccessRecord | null>(null)
   const [displaySeconds, setDisplaySeconds] = React.useState(0)
   const expiredRef = React.useRef(false)
+  const navigationDoneRef = React.useRef(false)
+  const backendBaseUrl = React.useMemo(() => getBackendBaseUrl(), [])
 
   React.useEffect(() => {
     expiredRef.current = false
@@ -71,8 +76,9 @@ export function PaymentWaitClient({
     const tick = () => {
       const left = Math.ceil((expiresAt - Date.now()) / 1000)
       setDisplaySeconds(left)
-      if (left <= 0 && !expiredRef.current) {
+      if (left <= 0 && !expiredRef.current && !navigationDoneRef.current) {
         expiredRef.current = true
+        navigationDoneRef.current = true
         router.replace("/checkout/payment/failed")
       }
     }
@@ -82,7 +88,9 @@ export function PaymentWaitClient({
   }, [phase, expiresAt, router])
 
   usePaymentConfirmationSocket(phase === "waiting" ? sessionId : null, (msg) => {
+    if (navigationDoneRef.current) return
     if (msg.type === "rejected") {
+      navigationDoneRef.current = true
       router.replace("/checkout/payment/failed")
       return
     }
@@ -94,6 +102,56 @@ export function PaymentWaitClient({
     setSuccessData(payload)
     setPhase("success")
   })
+
+  React.useEffect(() => {
+    if (phase !== "waiting") return
+
+    const poll = async () => {
+      if (navigationDoneRef.current) return
+      try {
+        const res = await fetch(`${backendBaseUrl}/api/v1/orders/${orderId}/status`, {
+          cache: "no-store",
+        })
+        const raw: unknown = await res.json().catch(() => null)
+        if (!res.ok || !raw || typeof raw !== "object") return
+        const status =
+          "status" in raw && typeof (raw as { status?: unknown }).status === "string"
+            ? (raw as { status: string }).status
+            : null
+
+        if (status === "payment_confirmed") {
+          const deliveryNumber =
+            "deliveryNumber" in raw &&
+            typeof (raw as { deliveryNumber?: unknown }).deliveryNumber === "string"
+              ? (raw as { deliveryNumber: string }).deliveryNumber
+              : "UPT000000"
+          const pickupCode =
+            "pickupCode" in raw &&
+            typeof (raw as { pickupCode?: unknown }).pickupCode === "string"
+              ? (raw as { pickupCode: string }).pickupCode
+              : "000-000"
+          const payload: PaymentSuccessRecord = { deliveryNumber, pickupCode }
+          writePaymentSuccess(sessionId, payload)
+          setSuccessData(payload)
+          setPhase("success")
+          return
+        }
+
+        if (status === "payment_rejected" || status === "cancelled") {
+          navigationDoneRef.current = true
+          router.replace("/checkout/payment/failed")
+        }
+      } catch {
+        // Network hiccup; next poll or websocket can still resolve state.
+      }
+    }
+
+    void poll()
+    const id = window.setInterval(() => {
+      void poll()
+    }, 5000)
+    return () => window.clearInterval(id)
+  }, [phase, backendBaseUrl, orderId, router, sessionId])
 
   if (phase === "init") {
     return (

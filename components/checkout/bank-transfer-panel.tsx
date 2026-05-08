@@ -7,7 +7,6 @@ import { Copy } from "lucide-react"
 
 import { acknowledgeBankTransferAction } from "@/app/actions/checkout-flow-actions"
 import { formatNaira } from "@/lib/delivery-quotes"
-import { MOCK_BANK_TRANSFER } from "@/lib/mock-bank-transfer"
 import { cn } from "@/lib/utils"
 
 function useCountdownSeconds(expiresAt: number) {
@@ -83,14 +82,18 @@ function SentMoneyButton() {
 }
 
 export function BankTransferPanel({
-  totalNaira,
+  amountNaira,
+  bankName,
+  accountNumber,
   expiresAt,
 }: {
-  totalNaira: number
+  amountNaira: number
+  bankName: string
+  accountNumber: string
   expiresAt: number
 }) {
   const timer = useCountdownSeconds(expiresAt)
-  const amount = formatNaira(totalNaira)
+  const amount = formatNaira(amountNaira)
 
   return (
     <div className="mx-auto w-full max-w-lg space-y-8 px-4 pb-20 pt-8 md:px-0 md:pb-24 md:pt-12">
@@ -106,15 +109,15 @@ export function BankTransferPanel({
             Bank name
           </p>
           <p className="mt-1 text-sm font-medium text-brand-foreground">
-            {MOCK_BANK_TRANSFER.bankName}
+            {bankName}
           </p>
         </div>
         <CopyRow
           label="Account number"
-          value={MOCK_BANK_TRANSFER.accountNumber}
-          copyValue={MOCK_BANK_TRANSFER.accountNumber}
+          value={accountNumber}
+          copyValue={accountNumber}
         />
-        <CopyRow label="Amount" value={amount} copyValue={String(totalNaira)} />
+        <CopyRow label="Amount" value={amount} copyValue={String(amountNaira)} />
         <p className="mt-4 text-center text-sm text-brand-foreground">
           This transaction expires in{" "}
           <span className="font-semibold text-brand-secondary tabular-nums">{timer}</span>

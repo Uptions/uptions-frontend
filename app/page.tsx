@@ -29,7 +29,8 @@ export default function Page() {
         <LandingNavbar
           logoHref="#why-us"
           navHrefPrefix=""
-          tryUptionsHref={audience === "business" ? "/join-us" : "/find-an-uption"}
+          tryUptionsHref={audience === "business" ? "/business/auth" : "/find-an-uption"}
+          ctaLabel={audience === "business" ? "Sign in" : "Try Uptions"}
         />
 
         <section

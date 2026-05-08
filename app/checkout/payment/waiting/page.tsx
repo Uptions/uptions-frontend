@@ -16,6 +16,10 @@ export default async function PaymentWaitingPage(props: { searchParams: SearchPa
 
   const flow = getFlow(sid)
   const serverWaitExpiresAt = flow?.paymentConfirmationWaitExpiresAt ?? null
+  const orderId = flow?.orderId ?? null
+  if (!orderId) {
+    redirect("/find-an-uption")
+  }
 
   return (
     <div
@@ -31,7 +35,11 @@ export default async function PaymentWaitingPage(props: { searchParams: SearchPa
           navHrefPrefix="/"
           tryUptionsHref="/find-an-uption"
         />
-        <PaymentWaitClient sessionId={sid} serverWaitExpiresAt={serverWaitExpiresAt} />
+        <PaymentWaitClient
+          sessionId={sid}
+          orderId={orderId}
+          serverWaitExpiresAt={serverWaitExpiresAt}
+        />
         <Footer />
       </main>
     </div>

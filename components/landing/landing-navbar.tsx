@@ -13,10 +13,12 @@ export function LandingNavbar({
   logoHref = "#why-us",
   navHrefPrefix = "",
   tryUptionsHref = "#why-us",
+  ctaLabel = "Try Uptions",
 }: {
   logoHref?: string
   navHrefPrefix?: string
   tryUptionsHref?: string
+  ctaLabel?: string
 }) {
   const activeId = useActiveLandingSection()
   const linksScrollRef = React.useRef<HTMLDivElement>(null)
@@ -118,7 +120,7 @@ export function LandingNavbar({
             )}
             asChild
           >
-            <a href={tryUptionsHref}>Try Uptions</a>
+            <a href={tryUptionsHref}>{ctaLabel}</a>
           </Button>
         </nav>
       </div>
