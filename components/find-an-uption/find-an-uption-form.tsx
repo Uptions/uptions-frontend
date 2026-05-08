@@ -69,12 +69,12 @@ function isValidNairaValue(raw: string): boolean {
   return Number.isFinite(num) && num > 0
 }
 
-const PROGRESS_SEGMENTS = 4
+const PROGRESS_SEGMENTS = 3
 
 function progressFilledSegments(step: 1 | 2 | 3): number {
   if (step === 1) return 1
   if (step === 2) return 2
-  return 4
+  return 3
 }
 
 const inputFieldClass =

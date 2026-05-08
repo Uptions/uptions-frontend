@@ -16,11 +16,12 @@ const FOOTER_NAV_B = [
 ] as const
 
 const SOCIAL = [
-  { label: "Instagram", href: "https://instagram.com", icon: InstagramIcon },
-  { label: "Facebook", href: "https://facebook.com", icon: FacebookIcon },
-  { label: "X", href: "https://x.com", icon: XIcon },
-  { label: "LinkedIn", href: "https://linkedin.com", icon: LinkedInIcon },
-  { label: "TikTok", href: "https://tiktok.com", icon: TikTokIcon },
+  {
+    label: "Instagram",
+    href: "https://www.instagram.com/useuptions?igsh=dW5rcjBla2FuOG54",
+    icon: InstagramIcon,
+  },
+  { label: "X", href: "https://x.com/useuptions?s=21", icon: XIcon },
 ] as const
 
 function InstagramIcon({ className }: { className?: string }) {
@@ -41,51 +42,12 @@ function InstagramIcon({ className }: { className?: string }) {
   )
 }
 
-function FacebookIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
-      <path
-        d="M14 8h2V5h-2a4 4 0 0 0-4 4v2H7v3h3v7h3v-7h2.5l.5-3H13V9a1 1 0 0 1 1-1Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
 function XIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
       <path
         d="M4 4l7.5 9.5L4 20h2.5l6-6.5 4.5 6.5H20l-8-10 7-6H16l-5.5 4.5L6.5 4H4Z"
         fill="currentColor"
-      />
-    </svg>
-  )
-}
-
-function LinkedInIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
-      <path
-        d="M6.5 8.5V17M6.5 6v.01M10 17v-5.2c0-1.5 1.2-2.8 2.8-2.8s2.8 1.1 2.8 2.8V17M17.5 11.8V17"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
-}
-
-function TikTokIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
-      <path
-        d="M14.5 4v11.2a3.3 3.3 0 1 1-3.3-3.3c.2 0 .4 0 .6.1V9.1a6.6 6.6 0 0 0-1-.1 5.5 5.5 0 1 0 5.5 5.5V7.8a8.5 8.5 0 0 0 4.7 1.4V7.2a4.8 4.8 0 0 1-2.5-.9L14.5 4Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
       />
     </svg>
   )
