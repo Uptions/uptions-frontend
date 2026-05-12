@@ -1,41 +1,57 @@
 "use client"
 
-import { BusinessShell } from "@/components/business/business-shell"
+import { useCallback, useEffect, useState } from "react"
 
-const poolOrders = [
-  {
-    name: "Order for Alex Harper",
-    eta: "ETA: 2 hours 30 minutes",
-    details: "Pickup: 123 Main St, Anytown | Delivery: 456 Oak Ave, Anytown | Weight: 2.3kg",
-    amount: "₦2,100",
-  },
-  {
-    name: "Order for Jordan Carter",
-    eta: "ETA: 1 hour 45 minutes",
-    details: "Pickup: 789 Pine Ln, Anytown | Delivery: 101 Elm Rd, Anytown | Weight: 4.3kg",
-    amount: "₦7,100",
-  },
-  {
-    name: "Order for Taylor Bennett",
-    eta: "ETA: 3 hours 15 minutes",
-    details: "Pickup: 222 Maple Dr, Anytown | Delivery: 333 Cedar Ct, Anytown | Weight: 2.3kg",
-    amount: "₦4,100",
-  },
-  {
-    name: "Order for Casey Morgan",
-    eta: "ETA: 2 hours 5 minutes",
-    details: "Pickup: 565 Birch St, Anytown | Delivery: 777 Spruce Ave, Anytown | Weight: 3kg",
-    amount: "₦8,100",
-  },
-  {
-    name: "Order for Jamie Lee",
-    eta: "ETA: 1 hour 30 minutes",
-    details: "Pickup: 888 Ash Blvd, Anytown | Delivery: 999 Willow Way, Anytown | Weight: 1.5kg",
-    amount: "₦1,100",
-  },
-]
+import { BusinessShell } from "@/components/business/business-shell"
+import { BusinessNoSession } from "@/components/business/business-no-session"
+import {
+  claimBusinessOrderPool,
+  formatNaira,
+  getBusinessOrderPool,
+  type PoolOrderRow,
+} from "@/lib/business-api"
+import { useBusinessSession } from "@/hooks/use-business-session"
 
 export default function BusinessOrderPoolPage() {
+  const { ready, authenticated, companyId } = useBusinessSession()
+  const [rows, setRows] = useState<PoolOrderRow[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [claimingId, setClaimingId] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setError(null)
+    try {
+      const data = await getBusinessOrderPool()
+      setRows(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load order pool")
+      setRows([])
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!ready || !authenticated) return
+    queueMicrotask(() => {
+      void load()
+    })
+  }, [ready, authenticated, load])
+
+  if (!ready) {
+    return (
+      <BusinessShell activeNav="order-pool">
+        <p className="mt-8 text-brand-secondary">Loading…</p>
+      </BusinessShell>
+    )
+  }
+
+  if (!authenticated) {
+    return <BusinessNoSession activeNav="order-pool" reason="sign-in" />
+  }
+
+  if (!companyId) {
+    return <BusinessNoSession activeNav="order-pool" reason="onboarding" />
+  }
+
   return (
     <BusinessShell activeNav="order-pool">
       <div className="mt-10">
@@ -48,6 +64,7 @@ export default function BusinessOrderPoolPage() {
           </div>
           <button
             type="button"
+            onClick={() => void load()}
             className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-secondary px-5 text-sm font-medium text-white"
           >
             Refresh
@@ -55,28 +72,56 @@ export default function BusinessOrderPoolPage() {
         </div>
       </div>
 
+      {error ? (
+        <p className="mt-4 text-sm text-[#E11D48]" role="alert">
+          {error}
+        </p>
+      ) : null}
+
       <div className="mt-6 space-y-2">
-        {poolOrders.map((order) => (
-          <div
-            key={order.name}
-            className="flex items-center justify-between rounded-lg bg-[#eef3f9] px-4 py-3"
-          >
-            <div>
-              <p className="font-semibold text-brand-foreground">{order.name}</p>
-              <p className="text-sm text-brand-secondary">{order.eta}</p>
-              <p className="text-xs text-brand-secondary">{order.details}</p>
-              <p className="mt-0.5 text-xl font-semibold text-brand-secondary">{order.amount}</p>
-            </div>
-            <button
-              type="button"
-              className="rounded-full bg-[#dce4ee] px-5 py-2 text-sm font-medium text-brand-foreground"
+        {rows.length === 0 ? (
+          <p className="py-10 text-center text-sm text-brand-secondary">
+            No unassigned orders in the pool right now.
+          </p>
+        ) : (
+          rows.map((order) => (
+            <div
+              key={order.id}
+              className="flex items-center justify-between rounded-lg bg-[#eef3f9] px-4 py-3"
             >
-              Claim order
-            </button>
-          </div>
-        ))}
+              <div>
+                <p className="font-semibold text-brand-foreground">{order.title}</p>
+                <p className="text-sm text-brand-secondary">{order.eta}</p>
+                <p className="text-xs text-brand-secondary">{order.route}</p>
+                <p className="mt-0.5 text-xl font-semibold text-brand-secondary">
+                  {formatNaira(order.suggestedPriceNaira)}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={claimingId === order.id}
+                onClick={() => {
+                  void (async () => {
+                    setClaimingId(order.id)
+                    setError(null)
+                    try {
+                      await claimBusinessOrderPool(companyId, order.id)
+                      await load()
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "Could not claim order")
+                    } finally {
+                      setClaimingId(null)
+                    }
+                  })()
+                }}
+                className="rounded-full bg-[#dce4ee] px-5 py-2 text-sm font-medium text-brand-foreground disabled:opacity-50"
+              >
+                {claimingId === order.id ? "Claiming…" : "Claim order"}
+              </button>
+            </div>
+          ))
+        )}
       </div>
     </BusinessShell>
   )
 }
-

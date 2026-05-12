@@ -8,6 +8,10 @@ import { useRouter } from "next/navigation"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { fetchBusinessMe, getBusinessAccessToken, setBusinessAccessToken } from "@/lib/business-auth"
+import { submitBusinessOnboarding } from "@/lib/business-api"
+import { buildBusinessOnboardingPayload } from "@/lib/business-onboarding-payload"
+import { saveBusinessSession } from "@/lib/business-session"
 import {
   clearBusinessSignUpFormDraft,
   loadBusinessSignUpFormDraft,
@@ -104,6 +108,7 @@ function Progress({ step }: { step: Step }) {
 
 export default function BusinessSignUpFormPage() {
   const router = useRouter()
+  const [authGate, setAuthGate] = useState<"pending" | "ready" | "redirect">("pending")
   const [step, setStep] = useState<Step>(0)
 
   const [representativeName, setRepresentativeName] = useState("")
@@ -128,8 +133,28 @@ export default function BusinessSignUpFormPage() {
   const [flatRatePerKm, setFlatRatePerKm] = useState("")
   const [hasInsurance, setHasInsurance] = useState<"yes" | "no" | "">("")
   const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!getBusinessAccessToken()) {
+      router.replace("/business/auth/signup")
+      setAuthGate("redirect")
+      return
+    }
+    void fetchBusinessMe()
+      .then((me) => {
+        setBusinessEmail((prev) => (prev.trim() ? prev : me.email))
+        setAuthGate("ready")
+      })
+      .catch(() => {
+        router.replace("/business/auth/signup")
+        setAuthGate("redirect")
+      })
+  }, [router])
+
+  useEffect(() => {
+    if (authGate !== "ready") return
     queueMicrotask(() => {
       const draft = loadBusinessSignUpFormDraft()
       if (!draft) return
@@ -156,9 +181,10 @@ export default function BusinessSignUpFormPage() {
       setHasInsurance(draft.hasInsurance)
       setAcceptedTerms(draft.acceptedTerms)
     })
-  }, [])
+  }, [authGate])
 
   useEffect(() => {
+    if (authGate !== "ready") return
     saveBusinessSignUpFormDraft({
       v: 1,
       step,
@@ -185,6 +211,7 @@ export default function BusinessSignUpFormPage() {
     })
   }, [
     acceptedTerms,
+    authGate,
     businessAddress,
     businessEmail,
     businessPhone,
@@ -245,6 +272,19 @@ export default function BusinessSignUpFormPage() {
       weightSensitive === "no" || (weightPriceMin.trim().length > 0 && weightPriceMax.trim().length > 0)
     return Boolean(chargeMode && weightSensitive && hasWeightRange && flatRatePerKm.trim() && hasInsurance && acceptedTerms)
   }, [acceptedTerms, chargeMode, flatRatePerKm, hasInsurance, weightPriceMax, weightPriceMin, weightSensitive])
+
+  if (authGate !== "ready") {
+    return (
+      <div
+        className="relative min-h-svh w-full bg-transparent bg-[url('/layer.svg')] bg-top bg-no-repeat [background-size:100%_auto]"
+        data-landing-root
+      >
+        <main className="relative z-10 flex min-h-svh items-center justify-center px-6 text-brand-secondary">
+          {authGate === "redirect" ? "Redirecting…" : "Loading…"}
+        </main>
+      </div>
+    )
+  }
 
   return (
     <div
@@ -324,10 +364,10 @@ export default function BusinessSignUpFormPage() {
                   onChange={(event) => setOperatingNote(event.target.value)}
                 />
 
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  disabled={!canContinueStep1}
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    disabled={!canContinueStep1}
                   className="mt-2 inline-flex h-12 w-full items-center justify-center rounded-lg bg-brand-secondary px-6 font-poppins text-base font-semibold text-brand-white transition-colors disabled:bg-[#D1D5DB] disabled:text-brand-foreground/50"
                 >
                   Next
@@ -554,6 +594,12 @@ export default function BusinessSignUpFormPage() {
                   I agree to the terms and conditions
                 </label>
 
+                {submitError ? (
+                  <p className="text-sm text-[#E11D48]" role="alert">
+                    {submitError}
+                  </p>
+                ) : null}
+
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
@@ -565,13 +611,61 @@ export default function BusinessSignUpFormPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      clearBusinessSignUpFormDraft()
-                      router.push("/business/dashboard?welcome=1")
+                      void (async () => {
+                        if (!canSubmit || submitting) return
+                        setSubmitError(null)
+                        setSubmitting(true)
+                        try {
+                          if (weightSensitive !== "yes" && weightSensitive !== "no") {
+                            throw new Error("Select whether weight affects your pricing")
+                          }
+                          if (hasInsurance !== "yes" && hasInsurance !== "no") {
+                            throw new Error("Select whether you offer insurance")
+                          }
+                          const payload = buildBusinessOnboardingPayload({
+                            representativeName,
+                            representativeRole,
+                            organizationName,
+                            businessEmail,
+                            businessPhone,
+                            businessAddress,
+                            cacOrNin,
+                            yearsInBusiness,
+                            operatingHoursNote: operatingNote,
+                            uploadedLogoName,
+                            deliveryCategoryUi: deliveryCategory,
+                            itemClass,
+                            hours,
+                            chargeModeUi: chargeMode,
+                            weightSensitive: weightSensitive as "yes" | "no",
+                            weightPriceMin,
+                            weightPriceMax,
+                            flatRatePerKm,
+                            hasInsurance: hasInsurance as "yes" | "no",
+                            acceptedTerms,
+                          })
+                          const res = await submitBusinessOnboarding(payload)
+                          if (res.accessToken) {
+                            setBusinessAccessToken(res.accessToken)
+                          }
+                          saveBusinessSession({
+                            v: 1,
+                            companyId: res.companyId,
+                            businessName: organizationName.trim(),
+                          })
+                          clearBusinessSignUpFormDraft()
+                          router.push("/business/dashboard?welcome=1")
+                        } catch (err) {
+                          setSubmitError(err instanceof Error ? err.message : "Submission failed")
+                        } finally {
+                          setSubmitting(false)
+                        }
+                      })()
                     }}
-                    disabled={!canSubmit}
+                    disabled={!canSubmit || submitting}
                     className="inline-flex h-12 items-center justify-center rounded-lg bg-brand-secondary px-6 font-poppins text-base font-semibold text-brand-white transition-colors disabled:bg-[#D1D5DB] disabled:text-brand-foreground/50"
                   >
-                    Submit
+                    {submitting ? "Submitting…" : "Submit"}
                   </button>
                 </div>
               </div>

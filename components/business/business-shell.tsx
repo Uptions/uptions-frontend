@@ -13,8 +13,11 @@ import {
   Wallet,
 } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { ReactNode, useState } from "react"
 
+import { logoutBusiness } from "@/lib/business-auth"
+import { clearBusinessSession } from "@/lib/business-session"
 import { cn } from "@/lib/utils"
 
 type NavKey = "home" | "orders" | "order-pool" | "wallet" | "account"
@@ -22,6 +25,8 @@ type NavKey = "home" | "orders" | "order-pool" | "wallet" | "account"
 type BusinessShellProps = {
   activeNav: NavKey
   children: ReactNode
+  /** Shown next to the notification / avatar cluster (e.g. onboarding status). */
+  headerExtra?: ReactNode
 }
 
 const navItems: Array<{
@@ -37,7 +42,8 @@ const navItems: Array<{
   { key: "account", label: "Account", href: "/business/account", icon: UserRound },
 ]
 
-export function BusinessShell({ activeNav, children }: BusinessShellProps) {
+export function BusinessShell({ activeNav, children, headerExtra }: BusinessShellProps) {
+  const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
 
   return (
@@ -124,6 +130,16 @@ export function BusinessShell({ activeNav, children }: BusinessShellProps) {
             )}
             <button
               type="button"
+              onClick={() => {
+                void (async () => {
+                  try {
+                    await logoutBusiness()
+                  } finally {
+                    clearBusinessSession()
+                    router.push("/business/auth")
+                  }
+                })()
+              }}
               className={cn(
                 "inline-flex items-center text-sm font-medium text-[#E11D48]",
                 collapsed ? "justify-center" : "gap-2",
@@ -137,17 +153,21 @@ export function BusinessShell({ activeNav, children }: BusinessShellProps) {
         </aside>
 
         <section className="flex min-w-0 flex-1 flex-col">
-          <header className="flex items-center justify-end gap-4">
-            <button
-              type="button"
-              className="inline-flex size-9 items-center justify-center rounded-lg border border-brand-foreground/15 bg-white/80 text-brand-foreground"
-              aria-label="Notifications"
-            >
-              <Bell className="size-4" />
-            </button>
-            <span className="inline-flex size-9 items-center justify-center rounded-full bg-[#f0d0b3] text-sm font-semibold text-brand-foreground">
-              K
-            </span>
+          <header className="flex w-full flex-wrap items-center gap-4">
+            <div className="min-w-0 flex-1" />
+            <div className="flex flex-wrap items-center justify-end gap-4">
+              {headerExtra}
+              <button
+                type="button"
+                className="inline-flex size-9 items-center justify-center rounded-lg border border-brand-foreground/15 bg-white/80 text-brand-foreground"
+                aria-label="Notifications"
+              >
+                <Bell className="size-4" />
+              </button>
+              <span className="inline-flex size-9 items-center justify-center rounded-full bg-[#f0d0b3] text-sm font-semibold text-brand-foreground">
+                K
+              </span>
+            </div>
           </header>
           {children}
         </section>

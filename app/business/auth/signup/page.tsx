@@ -2,9 +2,13 @@
 
 import { Eye, MapPin } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useState } from "react"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { clearBusinessSession, saveBusinessSession } from "@/lib/business-session"
+import { fetchBusinessMe, loginBusiness, registerBusiness } from "@/lib/business-auth"
 import { cn } from "@/lib/utils"
 
 const inputClassName =
@@ -40,6 +44,13 @@ function GoogleIcon() {
 }
 
 export default function BusinessSignUpPage() {
+  const router = useRouter()
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirm, setConfirm] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
   return (
     <div
       className="relative min-h-svh w-full bg-transparent bg-[url('/layer.svg')] bg-top bg-no-repeat [background-size:100%_auto]"
@@ -77,7 +88,40 @@ export default function BusinessSignUpPage() {
               Hello welcome, Let&apos;s help you get started.
             </p>
 
-            <form className="mt-8 space-y-5">
+            <form
+              className="mt-8 space-y-5"
+              onSubmit={(event) => {
+                event.preventDefault()
+                void (async () => {
+                  setError(null)
+                  if (password !== confirm) {
+                    setError("Passwords do not match")
+                    return
+                  }
+                  setSubmitting(true)
+                  try {
+                    await registerBusiness(email.trim(), password)
+                    await loginBusiness(email.trim(), password)
+                    clearBusinessSession()
+                    const me = await fetchBusinessMe()
+                    if (me.companyId) {
+                      saveBusinessSession({
+                        v: 1,
+                        companyId: me.companyId,
+                        businessName: "",
+                      })
+                      router.push("/business/dashboard")
+                    } else {
+                      router.push("/business/auth/signup/form")
+                    }
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : "Sign up failed")
+                  } finally {
+                    setSubmitting(false)
+                  }
+                })()
+              }}
+            >
               <div className="space-y-2">
                 <Label htmlFor="business-signup-email" className="text-brand-foreground">
                   Email
@@ -88,6 +132,9 @@ export default function BusinessSignUpPage() {
                   placeholder="Enter your email"
                   className={inputClassName}
                   autoComplete="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
                 />
               </div>
 
@@ -102,6 +149,10 @@ export default function BusinessSignUpPage() {
                     placeholder="Enter Password"
                     className={cn(inputClassName, "pr-10")}
                     autoComplete="new-password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    required
+                    minLength={8}
                   />
                   <Eye
                     className="pointer-events-none absolute right-3 top-1/2 size-5 -translate-y-1/2 text-brand-secondary"
@@ -121,6 +172,10 @@ export default function BusinessSignUpPage() {
                     placeholder="Enter Password"
                     className={cn(inputClassName, "pr-10")}
                     autoComplete="new-password"
+                    value={confirm}
+                    onChange={(event) => setConfirm(event.target.value)}
+                    required
+                    minLength={8}
                   />
                   <Eye
                     className="pointer-events-none absolute right-3 top-1/2 size-5 -translate-y-1/2 text-brand-secondary"
@@ -129,16 +184,25 @@ export default function BusinessSignUpPage() {
                 </div>
               </div>
 
-              <Link
-                href="/business/auth/signup/form"
-                className="inline-flex h-12 w-full items-center justify-center rounded-lg bg-brand-secondary px-6 font-poppins text-base font-semibold text-brand-white transition-colors hover:bg-brand-secondary/90"
+              {error ? (
+                <p className="text-sm text-[#E11D48]" role="alert">
+                  {error}
+                </p>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="inline-flex h-12 w-full items-center justify-center rounded-lg bg-brand-secondary px-6 font-poppins text-base font-semibold text-brand-white transition-colors hover:bg-brand-secondary/90 disabled:opacity-60"
               >
-                Sign Up
-              </Link>
+                {submitting ? "Creating account…" : "Sign Up"}
+              </button>
 
               <button
                 type="button"
-                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#D1D5DB] px-6 font-poppins text-base font-semibold text-brand-foreground transition-colors hover:bg-[#c5cbd6]"
+                tabIndex={-1}
+                aria-disabled="true"
+                className="pointer-events-none inline-flex h-12 w-full select-none items-center justify-center gap-2 rounded-lg bg-[#D1D5DB] px-6 font-poppins text-base font-semibold text-brand-foreground"
               >
                 <GoogleIcon />
                 Sign Up with Google
