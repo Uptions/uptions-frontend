@@ -133,7 +133,7 @@ export default function BusinessWalletPage() {
               </span>
               <div>
                 <p className="text-sm font-semibold text-brand-foreground">Bank Account</p>
-                <p className="text-xs text-brand-secondary">{summary.bankAccount.label}</p>
+                <p className="text-xs text-brand-secondary">No bank account linked</p>
               </div>
             </div>
             <button

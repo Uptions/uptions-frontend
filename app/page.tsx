@@ -19,6 +19,7 @@ export default function Page() {
     <div
       className="relative min-h-svh w-full bg-transparent bg-[url('/layer.svg')] bg-top bg-no-repeat [background-size:100%_auto]"
       data-landing-root
+      data-landing-cursor
     >
       <main
         id="landing"

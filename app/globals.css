@@ -213,27 +213,29 @@
   body {
     @apply bg-background text-foreground;
     }
-  a,
-  button:not(:disabled),
-  [role="button"]:not([aria-disabled="true"]),
-  summary,
-  label[for],
-  select {
-    cursor: url("/location-cursor.svg") 16 28, pointer;
-  }
-  button:disabled,
-  [aria-disabled="true"] {
-    cursor: not-allowed;
-  }
-  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-  textarea,
-  [contenteditable="true"] {
-    cursor: text;
-  }
-  /* Site-wide location-pin cursor (hotspot ~ tip of pin); inherit on plain content */
   html {
     @apply font-sans;
+  }
+  /* Location-pin cursor scoped to the landing page only. */
+  [data-landing-cursor] {
     cursor: url("/location-cursor.svg") 16 28, auto;
+  }
+  [data-landing-cursor] a,
+  [data-landing-cursor] button:not(:disabled),
+  [data-landing-cursor] [role="button"]:not([aria-disabled="true"]),
+  [data-landing-cursor] summary,
+  [data-landing-cursor] label[for],
+  [data-landing-cursor] select {
+    cursor: url("/location-cursor.svg") 16 28, pointer;
+  }
+  [data-landing-cursor] button:disabled,
+  [data-landing-cursor] [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+  [data-landing-cursor] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  [data-landing-cursor] textarea,
+  [data-landing-cursor] [contenteditable="true"] {
+    cursor: text;
   }
   h1,
   h2,

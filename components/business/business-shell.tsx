@@ -48,7 +48,7 @@ export function BusinessShell({ activeNav, children, headerExtra }: BusinessShel
 
   return (
     <div
-      className="relative min-h-svh w-full bg-transparent bg-[url('/layer.svg')] bg-top bg-no-repeat [background-size:100%_auto]"
+      className="relative min-h-svh w-full overflow-hidden bg-transparent before:pointer-events-none before:absolute before:inset-0 before:bg-[url('/layer.svg')] before:bg-top before:bg-no-repeat before:blur-[6px] before:[background-size:100%_auto] before:content-['']"
       data-landing-root
     >
       <main className="relative z-10 mx-auto flex min-h-svh w-full max-w-[1280px] gap-5 p-6">
