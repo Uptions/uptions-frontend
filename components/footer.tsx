@@ -57,15 +57,14 @@ const FOOTER_TAGLINE_WORDS = ["Compare", "Choose", "Ship", "Repeat"] as const
 
 function FooterTaglineMarqueeSegment() {
   return (
-    <div className="flex shrink-0 items-baseline">
+    <div className="flex shrink-0 items-baseline gap-10 pr-10 md:gap-16 md:pr-16">
       {FOOTER_TAGLINE_WORDS.map((word) => (
-        <span key={word} className="inline-flex tracking-wide items-baseline">
+        <span key={word} className="inline-flex items-baseline tracking-wide">
           <span
             className={cn(
-              /* Navy-on-navy hid “Choose”; bright blue reads on footer background */
               word === "Choose" || word === "Repeat"
-                ? "text-black"
-                : "text-white/[0.12]",
+                ? "text-brand-white"
+                : "text-white/20",
             )}
           >
             {word}
@@ -85,10 +84,10 @@ function FooterTaglineMarqueeSegment() {
 function FooterTaglineMarquee() {
   return (
     <div
-      className="pointer-events-none relative z-0 -mt-4 overflow-hidden px-2 pb-3 select-none sm:px-3"
+      className="pointer-events-none relative isolate overflow-hidden border-t border-white/10 py-4 select-none md:py-6"
       aria-hidden
     >
-      <div className="inline-flex w-max shrink-0 animate-footer-tagline-marquee font-heading text-[clamp(3.25rem,15vw,9rem)] font-bold leading-none tracking-tight">
+      <div className="flex w-max animate-footer-tagline-marquee font-heading text-[clamp(3.25rem,12vw,7.5rem)] font-bold leading-none tracking-tight [backface-visibility:hidden] [transform:translateZ(0)]">
         <FooterTaglineMarqueeSegment />
         <FooterTaglineMarqueeSegment />
       </div>
@@ -98,7 +97,7 @@ function FooterTaglineMarquee() {
 
 export function Footer() {
   return (
-    <footer className="relative w-full overflow-hidden bg-brand-primary text-brand-white">
+    <footer className="relative isolate w-full overflow-hidden bg-brand-primary text-brand-white">
       <div className="relative z-10 mx-auto max-w-7xl px-4 py-14 md:px-8 md:py-16">
         <div className="flex flex-col gap-12 md:flex-row md:items-start md:justify-between">
           <div className="max-w-sm">

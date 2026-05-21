@@ -30,7 +30,7 @@ function WhoCanUseBanner({ audience }: { audience: Audience }) {
         <ul className="flex flex-1 flex-wrap justify-start gap-2.5 md:justify-end">
           {tags.map((label) => (
             <li key={label}>
-              <span className="inline-flex rounded-full bg-brand-white px-4 py-2 text-center text-sm font-medium text-brand-secondary shadow-sm">
+              <span className="inline-flex rounded-full bg-brand-white px-4 py-2 text-center text-sm font-medium text-brand-secondary shadow-sm transition-[transform,box-shadow] duration-200 ease-out hover:scale-105 hover:shadow-[0_6px_20px_-6px_rgba(0,27,108,0.25)] active:scale-100">
                 {label}
               </span>
             </li>
@@ -72,10 +72,10 @@ export function HowItWorksSection({ audience }: { audience: Audience }) {
               <h3 className="font-poppins text-2xl font-bold text-[#007BFF] md:text-6xl">
                 {isBusiness ? "We get the Details." : "Give us the details."}
               </h3>
-              <p className="mt-4 text-base leading-relaxed text-brand-foreground md:text-lg">
+              <p className="mt-4 text-base leading-relaxed text-brand-white/90 md:text-lg">
                 {isBusiness
                   ? "Customers tell us what they need delivered."
-                  : "Tell us what you&apos;re sending and where—it only takes a sec."}
+                  : "Tell us what you're sending and where—it only takes a sec."}
               </p>
             </div>
           </div>
@@ -92,10 +92,10 @@ export function HowItWorksSection({ audience }: { audience: Audience }) {
                   </>
                 )}
               </h3>
-              <p className="mt-4 text-base leading-relaxed text-brand-foreground md:text-lg">
+              <p className="mt-4 text-base leading-relaxed text-brand-white/90 md:text-lg">
                 {isBusiness
                   ? "Your company gets matched with a request."
-                  : "We scan the streets so you don&apos;t have to—get the best deals instantly."}
+                  : "We scan the streets so you don't have to—get the best deals instantly."}
               </p>
             </div>
             <div className="relative order-1 w-full justify-self-center md:order-2 md:justify-self-end">
@@ -134,10 +134,10 @@ export function HowItWorksSection({ audience }: { audience: Audience }) {
               <h3 className="font-poppins text-2xl font-bold text-[#007BFF] md:text-6xl">
                 {isBusiness ? "Assign & Deliver" : "Pick your fave and get started."}
               </h3>
-              <p className="mt-4 text-base leading-relaxed text-brand-foreground md:text-lg">
+              <p className="mt-4 text-base leading-relaxed text-brand-white/90 md:text-lg">
                 {isBusiness
                   ? "Choose a rider, close the job, and get to the next order!"
-                  : "Choose your perfect match and let&apos;s get that package moving!"}
+                  : "Choose your perfect match and let's get that package moving!"}
               </p>
             </div>
           </div>

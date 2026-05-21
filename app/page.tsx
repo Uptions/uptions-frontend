@@ -26,7 +26,7 @@ export default function Page() {
         className="relative z-10 w-full bg-transparent"
         aria-label="Uptions landing"
       >
-        <LandingGsapAnimations />
+        <LandingGsapAnimations audience={audience} />
         <LandingNavbar
           logoHref="#why-us"
           navHrefPrefix=""
@@ -70,9 +70,7 @@ export default function Page() {
           <FaqSection audience={audience} />
         </section>
 
-        <div data-animate-section>
-          <Footer />
-        </div>
+        <Footer />
       </main>
     </div>
   )

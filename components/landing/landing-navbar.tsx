@@ -49,6 +49,42 @@ export function LandingNavbar({
     updateScribble()
   }, [updateScribble])
 
+  /* Mobile: nav links scroll horizontally — keep underline + active link in view */
+  React.useLayoutEffect(() => {
+    const scroller = linksScrollRef.current
+    const link = linkRefs.current[activeId]
+    if (!scroller || !link) return
+
+    updateScribble()
+
+    const isMobile = window.matchMedia("(max-width: 767px)").matches
+    if (!isMobile) return
+
+    const targetLeft =
+      link.offsetLeft - (scroller.clientWidth - link.offsetWidth) / 2
+    scroller.scrollTo({
+      left: Math.max(0, targetLeft),
+      behavior: "smooth",
+    })
+  }, [activeId, updateScribble])
+
+  React.useEffect(() => {
+    const row = linksRowRef.current
+    const scroller = linksScrollRef.current
+    if (!row) return
+
+    const ro = new ResizeObserver(() => updateScribble())
+    ro.observe(row)
+    scroller?.addEventListener("scroll", updateScribble, { passive: true })
+    window.addEventListener("resize", updateScribble)
+
+    return () => {
+      ro.disconnect()
+      scroller?.removeEventListener("scroll", updateScribble)
+      window.removeEventListener("resize", updateScribble)
+    }
+  }, [updateScribble])
+
   return (
     <header className="sticky top-4 z-50 px-4 md:top-6 md:px-6">
       <div className="mx-auto flex max-w-5xl justify-center">

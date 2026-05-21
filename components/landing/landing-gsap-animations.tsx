@@ -4,9 +4,11 @@ import { useEffect } from "react"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 
+import type { Audience } from "@/components/landing/audience"
+
 gsap.registerPlugin(ScrollTrigger)
 
-export function LandingGsapAnimations() {
+export function LandingGsapAnimations({ audience }: { audience: Audience }) {
   useEffect(() => {
     const ctx = gsap.context(() => {
       const sections = gsap.utils.toArray<HTMLElement>("[data-animate-section]")
@@ -32,6 +34,12 @@ export function LandingGsapAnimations() {
 
     return () => ctx.revert()
   }, [])
+
+  /* Hero / FAQ / about swap changes height — refresh triggers so footer does not flicker */
+  useEffect(() => {
+    const id = requestAnimationFrame(() => ScrollTrigger.refresh())
+    return () => cancelAnimationFrame(id)
+  }, [audience])
 
   return null
 }

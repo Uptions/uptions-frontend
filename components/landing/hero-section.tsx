@@ -124,10 +124,8 @@ export function HeroSection({
             alt=""
             className={cn(
               "pointer-events-none absolute left-0 top-full z-10 mt-2 w-full max-w-none",
-              "h-auto max-h-[min(2.75rem,8vw)] min-h-4 object-contain object-center transition-opacity duration-300 ease-out",
-              audience === "business"
-                ? "opacity-100"
-                : "opacity-0 motion-safe:group-hover:opacity-100",
+              "h-auto max-h-[min(2.75rem,8vw)] min-h-4 object-contain object-center",
+              "opacity-0 transition-opacity duration-300 ease-out motion-safe:group-hover:opacity-100",
             )}
             aria-hidden
           />

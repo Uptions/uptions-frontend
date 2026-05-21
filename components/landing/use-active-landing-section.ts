@@ -4,40 +4,54 @@ import * as React from "react"
 
 import { LANDING_NAV, type LandingNavId } from "@/components/landing/nav-config"
 
-/** Distance from viewport top; section is “active” once its top crosses above this line. */
-const ACTIVATION_LINE_PX = 112
+/**
+ * Section is active when its top has crossed this line (viewport coords).
+ * ~35% from the top tracks the visible block better than a fixed px offset
+ * (fixes “on FAQs but indicator still on How it works”).
+ */
+function activationLinePx(): number {
+  return Math.round(window.innerHeight * 0.35)
+}
 
 function pickActiveSection(): LandingNavId {
   const ids = LANDING_NAV.map((item) => item.id)
-  let current: LandingNavId = ids[0]
+  const line = activationLinePx()
 
-  for (const id of ids) {
+  for (let i = ids.length - 1; i >= 0; i--) {
+    const id = ids[i]
     const el = document.getElementById(id)
     if (!el) continue
-    const top = el.getBoundingClientRect().top
-    if (top <= ACTIVATION_LINE_PX) {
-      current = id
+    if (el.getBoundingClientRect().top <= line) {
+      return id
     }
   }
 
-  return current
+  return ids[0]
 }
 
 export function useActiveLandingSection() {
   const [activeId, setActiveId] = React.useState<LandingNavId>("why-us")
 
   React.useEffect(() => {
-    const onScroll = () => {
-      setActiveId(pickActiveSection())
+    let raf = 0
+
+    const sync = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        setActiveId(pickActiveSection())
+      })
     }
 
-    onScroll()
-    window.addEventListener("scroll", onScroll, { passive: true })
-    window.addEventListener("resize", onScroll)
+    sync()
+    window.addEventListener("scroll", sync, { passive: true })
+    window.addEventListener("resize", sync)
+    window.visualViewport?.addEventListener("resize", sync)
 
     return () => {
-      window.removeEventListener("scroll", onScroll)
-      window.removeEventListener("resize", onScroll)
+      cancelAnimationFrame(raf)
+      window.removeEventListener("scroll", sync)
+      window.removeEventListener("resize", sync)
+      window.visualViewport?.removeEventListener("resize", sync)
     }
   }, [])
 

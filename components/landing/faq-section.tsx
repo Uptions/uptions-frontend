@@ -77,16 +77,16 @@ export function FaqSection({ audience }: { audience: Audience }) {
       key={audience}
       className="animate-hero-content-swap mx-auto w-full max-w-3xl px-4 py-16 md:px-6 md:py-24"
     >
-      <div className="mx-auto w-fit max-w-full text-center">
+      <div className="group mx-auto w-fit max-w-full cursor-default text-center">
         <h2 className="font-heading text-3xl font-bold tracking-tight text-brand-primary md:text-4xl">
-          We know you&apos;ve got{" "}
+          {"We know you've got "}
           <span className="text-brand-secondary">questions</span>
         </h2>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- doodle fades in on hover (desktop) */}
         <img
           src="/Doodle.svg"
           alt=""
-          className="pointer-events-none mt-3 h-auto w-full min-w-0 object-contain object-center"
+          className="pointer-events-none mt-3 h-auto w-full min-w-0 object-contain object-center opacity-0 transition-opacity duration-300 ease-out motion-safe:group-hover:opacity-100"
           aria-hidden
         />
       </div>
