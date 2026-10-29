@@ -2,45 +2,26 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { MapPin, Minus } from "lucide-react"
+import { LoaderCircle, MapPin, Minus } from "lucide-react"
 
 import {
   readPaymentSuccess,
-  readPaymentWait,
   writePaymentSuccess,
-  writePaymentWait,
   type PaymentSuccessRecord,
 } from "@/lib/payment-wait-storage"
-import { cn } from "@/lib/utils"
-
-function formatMmSs(totalSeconds: number): string {
-  const m = Math.floor(Math.max(0, totalSeconds) / 60)
-  const s = Math.max(0, totalSeconds) % 60
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
-}
-
 export function PaymentWaitClient({
   sessionId,
   orderId,
   returnToken,
-  serverWaitExpiresAt,
 }: {
   sessionId: string
   orderId: string
   returnToken: string
-  serverWaitExpiresAt: number | null
 }) {
   const router = useRouter()
-  const [phase, setPhase] = React.useState<"init" | "waiting" | "success">("init")
-  const [expiresAt, setExpiresAt] = React.useState<number | null>(null)
+  const [phase, setPhase] = React.useState<"init" | "checking" | "pending" | "success">("init")
   const [successData, setSuccessData] = React.useState<PaymentSuccessRecord | null>(null)
-  const [displaySeconds, setDisplaySeconds] = React.useState(0)
-  const expiredRef = React.useRef(false)
   const navigationDoneRef = React.useRef(false)
-
-  React.useEffect(() => {
-    expiredRef.current = false
-  }, [sessionId])
 
   React.useEffect(() => {
     queueMicrotask(() => {
@@ -51,41 +32,18 @@ export function PaymentWaitClient({
         return
       }
 
-      const stored = readPaymentWait(sessionId)
-      // Bachs redirects to this page with an order ID, not a local wait
-      // record. Keep polling for the duration of its one-hour checkout
-      // session instead of treating that normal redirect as a failure.
-      const deadline = stored?.expiresAt ?? serverWaitExpiresAt ?? Date.now() + 60 * 60 * 1000
-
-      if (!stored && serverWaitExpiresAt) {
-        writePaymentWait(sessionId, serverWaitExpiresAt)
-      }
-
-      setExpiresAt(deadline)
-      setDisplaySeconds(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)))
-      setPhase("waiting")
+      setPhase("checking")
     })
-  }, [sessionId, serverWaitExpiresAt, router])
+  }, [sessionId])
 
   React.useEffect(() => {
-    if (phase !== "waiting" || !expiresAt) return
-
-    const tick = () => {
-      const left = Math.ceil((expiresAt - Date.now()) / 1000)
-      setDisplaySeconds(left)
-      if (left <= 0 && !expiredRef.current && !navigationDoneRef.current) {
-        expiredRef.current = true
-        navigationDoneRef.current = true
-        router.replace("/checkout/payment/failed")
-      }
-    }
-    tick()
-    const id = window.setInterval(tick, 1000)
-    return () => window.clearInterval(id)
-  }, [phase, expiresAt, router])
+    if (phase !== "checking") return
+    const id = window.setTimeout(() => setPhase("pending"), 8_000)
+    return () => window.clearTimeout(id)
+  }, [phase])
 
   React.useEffect(() => {
-    if (phase !== "waiting") return
+    if (phase !== "checking" && phase !== "pending") return
 
     const poll = async () => {
       if (navigationDoneRef.current) return
@@ -132,7 +90,7 @@ export function PaymentWaitClient({
     void poll()
     const id = window.setInterval(() => {
       void poll()
-    }, 5000)
+    }, phase === "checking" ? 2_000 : 10_000)
     return () => window.clearInterval(id)
   }, [phase, orderId, returnToken, router, sessionId])
 
@@ -184,22 +142,17 @@ export function PaymentWaitClient({
     <div className="mx-auto w-full max-w-md px-4 pb-20 pt-12 md:pt-16">
       <div className="rounded-2xl bg-white p-8 shadow-[0_12px_40px_-16px_rgba(0,27,108,0.2)] md:p-10">
         <div className="mx-auto flex size-14 items-center justify-center rounded-xl bg-brand-secondary text-white md:size-16">
-          <MapPin className="size-7 md:size-8" aria-hidden />
+          {phase === "checking" ? <LoaderCircle className="size-7 animate-spin md:size-8" aria-hidden /> : <MapPin className="size-7 md:size-8" aria-hidden />}
         </div>
         <h1 className="mt-6 text-center text-xl font-bold text-brand-foreground md:text-2xl">
-          We are checking
+          {phase === "checking" ? "Checking your payment" : "Bank transfer pending"}
         </h1>
         <p className="mt-3 text-center text-brand-foreground">
-          Please wait, while we confirm your payment
+          {phase === "checking"
+            ? "We’re securely checking Bachs for your payment confirmation."
+            : "Your transfer has not been confirmed yet. We’ll update this page automatically as soon as Bachs verifies it."}
         </p>
-        <p
-          className={cn(
-            "mt-8 text-center text-lg font-bold tabular-nums text-brand-secondary md:text-xl",
-          )}
-          aria-live="polite"
-        >
-          In {formatMmSs(displaySeconds)}
-        </p>
+        {phase === "pending" ? <p className="mt-6 text-center text-sm text-brand-foreground/75">You can keep this page open while we check again.</p> : null}
       </div>
     </div>
   )

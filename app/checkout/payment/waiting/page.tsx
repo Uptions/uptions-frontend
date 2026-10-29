@@ -17,7 +17,6 @@ export default async function PaymentWaitingPage(props: { searchParams: SearchPa
   }
 
   const flow = sid ? getFlow(sid) : null
-  const serverWaitExpiresAt = flow?.paymentConfirmationWaitExpiresAt ?? null
   const orderId = directOrderId || flow?.orderId || null
   if (!orderId) {
     redirect("/find-an-uption")
@@ -41,7 +40,6 @@ export default async function PaymentWaitingPage(props: { searchParams: SearchPa
           sessionId={sid || orderId}
           orderId={orderId}
           returnToken={returnToken}
-          serverWaitExpiresAt={serverWaitExpiresAt}
         />
         <Footer />
       </main>
