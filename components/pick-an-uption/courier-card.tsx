@@ -51,6 +51,9 @@ export function CourierCard({
       <CourierLogo courierId={courier.id} name={courier.name} />
       <div className="min-w-0 flex-1">
         <p className="font-bold text-brand-foreground">{courier.name}</p>
+        <p className="mt-1 text-sm font-medium text-brand-foreground/70">
+          Recommended vehicle: {courier.recommendedVehicleType}
+        </p>
         <div className="mt-1.5">
           <StarRow rating={courier.rating} />
         </div>

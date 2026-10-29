@@ -1,10 +1,14 @@
 import type { ReactNode } from "react"
 import Link from "next/link"
+import { ArrowLeft } from "lucide-react"
 
 import { proceedToBankTransferAction } from "@/app/actions/checkout-flow-actions"
 import type { CheckoutFlowState } from "@/lib/checkout-flow-store"
 import { formatNaira } from "@/lib/delivery-quotes"
 import { cn } from "@/lib/utils"
+
+import { EditPartyModal } from "./edit-party-modal"
+import { CancelOrderButton } from "./cancel-order-button"
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
@@ -37,6 +41,13 @@ export function CheckoutSummary({ flow }: { flow: CheckoutFlowState }) {
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pb-20 pt-8 md:px-6 md:pb-24 md:pt-12">
+      <Link
+        href="/pick-an-uption"
+        className="mb-4 inline-flex items-center gap-2 rounded-md px-1 py-1 text-sm font-semibold text-brand-primary transition-colors hover:text-brand-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary focus-visible:ring-offset-2"
+      >
+        <ArrowLeft className="size-4" aria-hidden />
+        Back to courier options
+      </Link>
       <h1 className="font-heading text-4xl font-bold text-brand-secondary md:text-5xl">
         Checkout
       </h1>
@@ -46,12 +57,7 @@ export function CheckoutSummary({ flow }: { flow: CheckoutFlowState }) {
           <section className="space-y-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <SectionLabel>Shipping details: Sender</SectionLabel>
-              <Link
-                href="/find-an-uption"
-                className="text-sm font-medium text-brand-secondary hover:underline"
-              >
-                Edit
-              </Link>
+              <EditPartyModal party="sender" details={sender} />
             </div>
             <div className="space-y-3 rounded-xl border border-brand-secondary/30 bg-white/80 p-4 md:p-5">
               <DetailLine label="Name" value={sender.name} />
@@ -64,12 +70,7 @@ export function CheckoutSummary({ flow }: { flow: CheckoutFlowState }) {
           <section className="space-y-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <SectionLabel>Shipping details: Receiver</SectionLabel>
-              <Link
-                href="/find-an-uption"
-                className="text-sm font-medium text-brand-secondary hover:underline"
-              >
-                Edit
-              </Link>
+              <EditPartyModal party="receiver" details={receiver} />
             </div>
             <div className="space-y-3 rounded-xl border border-brand-secondary/30 bg-white/80 p-4 md:p-5">
               <DetailLine label="Name" value={receiver.name} />
@@ -85,7 +86,7 @@ export function CheckoutSummary({ flow }: { flow: CheckoutFlowState }) {
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <SectionLabel>Shipping details: Package</SectionLabel>
               <Link
-                href="/find-an-uption"
+                href="/pick-an-uption"
                 className="text-sm font-medium text-brand-secondary hover:underline"
               >
                 Change
@@ -133,15 +134,18 @@ export function CheckoutSummary({ flow }: { flow: CheckoutFlowState }) {
         </div>
       </div>
 
-      <form action={proceedToBankTransferAction} className="mt-12 flex justify-center">
-        <button
-          type="submit"
-          className="flex h-12 w-full max-w-md items-center justify-center gap-1 rounded-lg bg-brand-secondary px-6 font-poppins text-base font-semibold text-white transition-colors hover:bg-brand-secondary/90"
-        >
-          Checkout
-          <span aria-hidden>{">"}</span>
-        </button>
-      </form>
+      <div className="mt-12 flex flex-col items-center gap-4">
+        <form action={proceedToBankTransferAction} className="flex w-full justify-center">
+          <button
+            type="submit"
+            className="flex h-12 w-full max-w-md items-center justify-center gap-1 rounded-lg bg-brand-secondary px-6 font-poppins text-base font-semibold text-white transition-colors hover:bg-brand-secondary/90"
+          >
+            Checkout
+            <span aria-hidden>{">"}</span>
+          </button>
+        </form>
+        <CancelOrderButton />
+      </div>
     </div>
   )
 }

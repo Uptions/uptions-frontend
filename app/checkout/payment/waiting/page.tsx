@@ -5,18 +5,20 @@ import { Footer } from "@/components/footer"
 import { LandingNavbar } from "@/components/landing/landing-navbar"
 import { getFlow } from "@/lib/checkout-flow-store"
 
-type SearchParams = Promise<{ sid?: string }>
+type SearchParams = Promise<{ sid?: string; orderId?: string; return_token?: string }>
 
 export default async function PaymentWaitingPage(props: { searchParams: SearchParams }) {
   const sp = await props.searchParams
   const sid = typeof sp.sid === "string" ? sp.sid : ""
-  if (!sid) {
+  const directOrderId = typeof sp.orderId === "string" ? sp.orderId : ""
+  const returnToken = typeof sp.return_token === "string" ? sp.return_token : ""
+  if (!sid && !directOrderId) {
     redirect("/find-an-uption")
   }
 
-  const flow = getFlow(sid)
+  const flow = sid ? getFlow(sid) : null
   const serverWaitExpiresAt = flow?.paymentConfirmationWaitExpiresAt ?? null
-  const orderId = flow?.orderId ?? null
+  const orderId = directOrderId || flow?.orderId || null
   if (!orderId) {
     redirect("/find-an-uption")
   }
@@ -36,8 +38,9 @@ export default async function PaymentWaitingPage(props: { searchParams: SearchPa
           tryUptionsHref="/find-an-uption"
         />
         <PaymentWaitClient
-          sessionId={sid}
+          sessionId={sid || orderId}
           orderId={orderId}
+          returnToken={returnToken}
           serverWaitExpiresAt={serverWaitExpiresAt}
         />
         <Footer />

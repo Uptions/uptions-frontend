@@ -4,19 +4,9 @@ import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 
 import { getBackendBaseUrl } from "@/lib/backend-base-url"
-import {
-  createFlowState,
-  getFlow,
-  setFlow,
-  type CheckoutFlowState,
-} from "@/lib/checkout-flow-store"
-import { UPTIONS_FLOW_COOKIE, flowCookieOptions } from "@/lib/checkout-flow-cookie"
+import { orderAccessCookieName, UPTIONS_FLOW_COOKIE, flowCookieOptions } from "@/lib/checkout-flow-cookie"
 import { isDeliveryQuoteResponse, type DeliveryQuoteRequest } from "@/lib/delivery-quotes"
-
-async function getFlowIdFromCookie(): Promise<string | null> {
-  const jar = await cookies()
-  return jar.get(UPTIONS_FLOW_COOKIE)?.value ?? null
-}
+import { loadCheckoutFlow } from "@/lib/load-checkout-flow"
 
 function getErrorMessage(raw: unknown, fallback: string): string {
   return raw &&
@@ -48,25 +38,7 @@ export async function submitFindUptionFormAction(
 ): Promise<{ error: string } | undefined> {
   const baseUrl = getBackendBaseUrl()
 
-  const quoteRes = await fetch(`${baseUrl}/api/v1/quotes`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    cache: "no-store",
-  })
-
-  const quoteRaw: unknown = await quoteRes.json().catch(() => null)
-  if (!quoteRes.ok) {
-    return {
-      error: getErrorMessage(quoteRaw, "Could not fetch courier options. Try again."),
-    }
-  }
-
-  if (!isDeliveryQuoteResponse(quoteRaw)) {
-    return { error: "Unexpected response from server. Try again." }
-  }
-
-  // Order-intent is saved right after estimate is returned.
+  // The backend calculates and persists the quote with the order intent.
   const orderRes = await fetch(`${baseUrl}/api/v1/orders`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -88,17 +60,20 @@ export async function submitFindUptionFormAction(
     return { error: "Unexpected order-intent response from server." }
   }
 
-  const flowId = crypto.randomUUID()
-  const state = createFlowState(
-    (orderRaw as { orderId: string }).orderId,
-    (orderRaw as { sessionId: string }).sessionId,
-    payload,
-    quoteRaw,
-  )
-  setFlow(flowId, state)
+  const persistedQuote = (orderRaw as { quote?: unknown }).quote
+  if (!isDeliveryQuoteResponse(persistedQuote)) {
+    return { error: "Unexpected saved quote response from server." }
+  }
+
+  const orderAccessToken = (orderRaw as { guestAccessToken?: unknown }).guestAccessToken
+  if (typeof orderAccessToken !== "string" || !orderAccessToken) {
+    return { error: "Could not secure this order. Try again." }
+  }
 
   const jar = await cookies()
-  jar.set(UPTIONS_FLOW_COOKIE, flowId, flowCookieOptions)
+  const orderId = (orderRaw as { orderId: string }).orderId
+  jar.set(UPTIONS_FLOW_COOKIE, orderId, flowCookieOptions)
+  jar.set(orderAccessCookieName(orderId), orderAccessToken, flowCookieOptions)
 
   redirect("/pick-an-uption")
 }
@@ -112,12 +87,7 @@ export async function selectCourierAndCheckoutAction(
     return { error: "Choose a courier to continue." }
   }
 
-  const flowId = await getFlowIdFromCookie()
-  if (!flowId) {
-    return { error: "Session expired. Start again from the form." }
-  }
-
-  const flow = getFlow(flowId)
+  const flow = await loadCheckoutFlow()
   if (!flow) {
     return { error: "Session expired. Start again from the form." }
   }
@@ -128,9 +98,12 @@ export async function selectCourierAndCheckoutAction(
   }
 
   const baseUrl = getBackendBaseUrl()
+  const jar = await cookies()
+  const orderAccessToken = jar.get(orderAccessCookieName(flow.orderId))?.value
+  if (!orderAccessToken) return { error: "Order access expired. Start again." }
   const res = await fetch(`${baseUrl}/api/v1/orders/${flow.orderId}/select-courier`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-order-access-token": orderAccessToken },
     body: JSON.stringify({ courierId }),
     cache: "no-store",
   })
@@ -141,41 +114,76 @@ export async function selectCourierAndCheckoutAction(
     }
   }
 
-  const totals =
-    raw && typeof raw === "object" && "totals" in raw
-      ? (raw as { totals?: { subtotalNaira?: number; serviceChargeNaira?: number; totalNaira?: number } })
-          .totals
-      : undefined
-
-  const next: CheckoutFlowState = {
-    ...flow,
-    selectedCourierId: courier.id,
-    selectedCourierName: courier.name,
-    subtotalNaira:
-      typeof totals?.subtotalNaira === "number" ? totals.subtotalNaira : flow.subtotalNaira,
-    serviceChargeNaira:
-      typeof totals?.serviceChargeNaira === "number"
-        ? totals.serviceChargeNaira
-        : flow.serviceChargeNaira,
-    totalNaira: typeof totals?.totalNaira === "number" ? totals.totalNaira : flow.totalNaira,
-  }
-  setFlow(flowId, next)
   redirect("/checkout")
 }
 
-export async function proceedToBankTransferAction(): Promise<void> {
-  const flowId = await getFlowIdFromCookie()
-  if (!flowId) {
-    redirect("/find-an-uption")
+export async function updateOrderPartyAction(
+  party: "sender" | "receiver",
+  details: DeliveryQuoteRequest["sender"],
+): Promise<{ error: string } | undefined> {
+  const flow = await loadCheckoutFlow()
+  if (!flow) return { error: "Session expired. Start again from the form." }
+
+  const jar = await cookies()
+  const orderAccessToken = jar.get(orderAccessCookieName(flow.orderId))?.value
+  if (!orderAccessToken) return { error: "Order access expired. Start again." }
+
+  const response = await fetch(`${getBackendBaseUrl()}/api/v1/orders/${flow.orderId}/party`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "x-order-access-token": orderAccessToken,
+    },
+    body: JSON.stringify({ party, details }),
+    cache: "no-store",
+  })
+  const raw: unknown = await response.json().catch(() => null)
+  if (!response.ok) {
+    return { error: getErrorMessage(raw, "Could not update delivery details.") }
   }
-  const flow = getFlow(flowId)
+
+  // Address/state changes produce a fresh server-side quote, so require a
+  // new courier choice rather than reusing a potentially ineligible option.
+  redirect("/pick-an-uption")
+}
+
+export async function cancelOrderAction(): Promise<{ error: string } | undefined> {
+  const flow = await loadCheckoutFlow()
+  if (!flow) return { error: "Session expired. Start again from the form." }
+
+  const jar = await cookies()
+  const accessCookie = orderAccessCookieName(flow.orderId)
+  const orderAccessToken = jar.get(accessCookie)?.value
+  if (!orderAccessToken) return { error: "Order access expired. Start again." }
+
+  const response = await fetch(`${getBackendBaseUrl()}/api/v1/orders/${flow.orderId}/cancel`, {
+    method: "PATCH",
+    headers: { "x-order-access-token": orderAccessToken },
+    cache: "no-store",
+  })
+  const raw: unknown = await response.json().catch(() => null)
+  if (!response.ok) {
+    return { error: getErrorMessage(raw, "Could not cancel this order.") }
+  }
+
+  jar.delete(UPTIONS_FLOW_COOKIE)
+  jar.delete(accessCookie)
+  redirect("/find-an-uption")
+}
+
+export async function proceedToBankTransferAction(): Promise<void> {
+  const flow = await loadCheckoutFlow()
   if (!flow?.selectedCourierId) {
     redirect("/pick-an-uption")
   }
 
   const baseUrl = getBackendBaseUrl()
+  const jar = await cookies()
+  const orderAccessToken = jar.get(orderAccessCookieName(flow.orderId))?.value
+  if (!orderAccessToken) redirect("/find-an-uption")
   const res = await fetch(`${baseUrl}/api/v1/orders/${flow.orderId}/checkout`, {
     method: "POST",
+    headers: { "x-order-access-token": orderAccessToken },
     cache: "no-store",
   })
   const raw: unknown = await res.json().catch(() => null)
@@ -183,47 +191,14 @@ export async function proceedToBankTransferAction(): Promise<void> {
     redirect("/checkout")
   }
 
-  const transfer =
-    raw && typeof raw === "object" && "transferDetails" in raw
-      ? (raw as { transferDetails?: { bankName?: string; accountNumber?: string; amountNaira?: number } })
-          .transferDetails
-      : undefined
-  const paymentExpiresAt = toMsIfDateLike(
-    raw &&
-      typeof raw === "object" &&
-      "paymentConfirmationWaitExpiresAt" in raw
-      ? (raw as { paymentConfirmationWaitExpiresAt?: unknown }).paymentConfirmationWaitExpiresAt
-      : null,
-  )
-
-  const next: CheckoutFlowState = {
-    ...flow,
-    paymentExpiresAt: paymentExpiresAt ?? Date.now() + 10 * 60 * 1000,
-    transferDetails:
-      transfer &&
-      typeof transfer.bankName === "string" &&
-      typeof transfer.accountNumber === "string" &&
-      typeof transfer.amountNaira === "number"
-        ? {
-            bankName: transfer.bankName,
-            accountNumber: transfer.accountNumber,
-            amountNaira: transfer.amountNaira,
-          }
-        : flow.transferDetails,
-  }
-  setFlow(flowId, next)
-  redirect("/checkout/payment")
+  const checkoutUrl = raw && typeof raw === "object" && "checkoutUrl" in raw ? (raw as { checkoutUrl?: unknown }).checkoutUrl : null
+  if (typeof checkoutUrl !== "string") redirect("/checkout")
+  redirect(checkoutUrl)
 }
 
-const ADMIN_CONFIRMATION_WINDOW_MS = 10 * 60 * 1000
-
 export async function acknowledgeBankTransferAction(): Promise<void> {
-  const flowId = await getFlowIdFromCookie()
-  if (!flowId) {
-    redirect("/find-an-uption")
-  }
-  const flow = getFlow(flowId)
-  if (!flow?.paymentExpiresAt) {
+  const flow = await loadCheckoutFlow()
+  if (!flow?.selectedCourierId) {
     redirect("/checkout")
   }
 
@@ -236,11 +211,5 @@ export async function acknowledgeBankTransferAction(): Promise<void> {
     cache: "no-store",
   }).catch(() => null)
 
-  const waitUntil = Date.now() + ADMIN_CONFIRMATION_WINDOW_MS
-  setFlow(flowId, {
-    ...flow,
-    paymentConfirmationWaitExpiresAt: waitUntil,
-  })
-
-  redirect(`/checkout/payment/waiting?sid=${encodeURIComponent(flowId)}`)
+  redirect(`/checkout/payment/waiting?orderId=${encodeURIComponent(flow.orderId)}`)
 }

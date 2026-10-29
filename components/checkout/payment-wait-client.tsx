@@ -4,8 +4,6 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import { MapPin, Minus } from "lucide-react"
 
-import { usePaymentConfirmationSocket } from "@/hooks/use-payment-confirmation-socket"
-import { getBackendBaseUrl } from "@/lib/backend-base-url"
 import {
   readPaymentSuccess,
   readPaymentWait,
@@ -24,10 +22,12 @@ function formatMmSs(totalSeconds: number): string {
 export function PaymentWaitClient({
   sessionId,
   orderId,
+  returnToken,
   serverWaitExpiresAt,
 }: {
   sessionId: string
   orderId: string
+  returnToken: string
   serverWaitExpiresAt: number | null
 }) {
   const router = useRouter()
@@ -37,7 +37,6 @@ export function PaymentWaitClient({
   const [displaySeconds, setDisplaySeconds] = React.useState(0)
   const expiredRef = React.useRef(false)
   const navigationDoneRef = React.useRef(false)
-  const backendBaseUrl = React.useMemo(() => getBackendBaseUrl(), [])
 
   React.useEffect(() => {
     expiredRef.current = false
@@ -53,12 +52,10 @@ export function PaymentWaitClient({
       }
 
       const stored = readPaymentWait(sessionId)
-      const deadline = stored?.expiresAt ?? serverWaitExpiresAt
-
-      if (!deadline) {
-        router.replace("/checkout/payment/failed")
-        return
-      }
+      // Bachs redirects to this page with an order ID, not a local wait
+      // record. Keep polling for the duration of its one-hour checkout
+      // session instead of treating that normal redirect as a failure.
+      const deadline = stored?.expiresAt ?? serverWaitExpiresAt ?? Date.now() + 60 * 60 * 1000
 
       if (!stored && serverWaitExpiresAt) {
         writePaymentWait(sessionId, serverWaitExpiresAt)
@@ -87,29 +84,15 @@ export function PaymentWaitClient({
     return () => window.clearInterval(id)
   }, [phase, expiresAt, router])
 
-  usePaymentConfirmationSocket(phase === "waiting" ? sessionId : null, (msg) => {
-    if (navigationDoneRef.current) return
-    if (msg.type === "rejected") {
-      navigationDoneRef.current = true
-      router.replace("/checkout/payment/failed")
-      return
-    }
-    const payload: PaymentSuccessRecord = {
-      deliveryNumber: msg.deliveryNumber,
-      pickupCode: msg.pickupCode,
-    }
-    writePaymentSuccess(sessionId, payload)
-    setSuccessData(payload)
-    setPhase("success")
-  })
-
   React.useEffect(() => {
     if (phase !== "waiting") return
 
     const poll = async () => {
       if (navigationDoneRef.current) return
       try {
-        const res = await fetch(`${backendBaseUrl}/api/v1/orders/${orderId}/status`, {
+        const query = new URLSearchParams({ orderId })
+        if (returnToken) query.set("returnToken", returnToken)
+        const res = await fetch(`/api/order-status?${query.toString()}`, {
           cache: "no-store",
         })
         const raw: unknown = await res.json().catch(() => null)
@@ -151,7 +134,7 @@ export function PaymentWaitClient({
       void poll()
     }, 5000)
     return () => window.clearInterval(id)
-  }, [phase, backendBaseUrl, orderId, router, sessionId])
+  }, [phase, orderId, returnToken, router, sessionId])
 
   if (phase === "init") {
     return (

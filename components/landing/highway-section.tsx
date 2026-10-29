@@ -40,7 +40,7 @@ export function HighwaySection() {
                 alt=""
                 width={168}
                 height={86}
-                className={vehicleClass}
+                className={`${vehicleClass} rotate-180`}
               />
             </div>
           </div>

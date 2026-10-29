@@ -38,10 +38,10 @@ function isQuoteRequest(v: unknown): v is DeliveryQuoteRequest {
 
 /** Placeholder couriers — replace with real provider search from new-uptions-backend */
 const MOCK_COURIERS: CourierOptionDTO[] = [
-  { id: "jumia", name: "Jumia", rating: 5, priceNaira: 5000 },
-  { id: "speedaf", name: "Speedaf", rating: 5, priceNaira: 6500 },
-  { id: "uber-eats", name: "Uber Eats", rating: 5, priceNaira: 7500 },
-  { id: "grocery-express", name: "Grocery Express", rating: 5, priceNaira: 4900 },
+  { id: "jumia", name: "Jumia", rating: 5, priceNaira: 5000, recommendedVehicleType: "motorcycle" },
+  { id: "speedaf", name: "Speedaf", rating: 5, priceNaira: 6500, recommendedVehicleType: "motorcycle" },
+  { id: "uber-eats", name: "Uber Eats", rating: 5, priceNaira: 7500, recommendedVehicleType: "motorcycle" },
+  { id: "grocery-express", name: "Grocery Express", rating: 5, priceNaira: 4900, recommendedVehicleType: "motorcycle" },
 ]
 
 export async function POST(req: Request) {
@@ -62,6 +62,7 @@ export async function POST(req: Request) {
   const payload: DeliveryQuoteResponse = {
     quoteId: `q_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`,
     estimatedMinutes: 45,
+    distanceKm: 11.25,
     couriers: MOCK_COURIERS,
   }
 

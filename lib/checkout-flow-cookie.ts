@@ -1,4 +1,5 @@
 export const UPTIONS_FLOW_COOKIE = "uptions_checkout_flow_id"
+export const orderAccessCookieName = (orderId: string) => `uptions_order_access_${orderId}`
 
 export const flowCookieOptions = {
   httpOnly: true,

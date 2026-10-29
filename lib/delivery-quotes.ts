@@ -27,11 +27,15 @@ export type CourierOptionDTO = {
   rating: number
   /** Whole naira (e.g. 5000) */
   priceNaira: number
+  /** Vehicle capacity selected by the quote engine for this parcel. */
+  recommendedVehicleType: string
 }
 
 export type DeliveryQuoteResponse = {
   quoteId: string
   estimatedMinutes: number
+  /** Road distance used to calculate the delivery quote. */
+  distanceKm: number
   couriers: CourierOptionDTO[]
 }
 
@@ -41,7 +45,11 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 export function isDeliveryQuoteResponse(v: unknown): v is DeliveryQuoteResponse {
   if (!isRecord(v)) return false
-  if (typeof v.quoteId !== "string" || typeof v.estimatedMinutes !== "number") return false
+  if (
+    typeof v.quoteId !== "string" ||
+    typeof v.estimatedMinutes !== "number" ||
+    typeof v.distanceKm !== "number"
+  ) return false
   if (!Array.isArray(v.couriers)) return false
   return v.couriers.every(
     (c) =>
@@ -49,7 +57,8 @@ export function isDeliveryQuoteResponse(v: unknown): v is DeliveryQuoteResponse 
       typeof c.id === "string" &&
       typeof c.name === "string" &&
       typeof c.rating === "number" &&
-      typeof c.priceNaira === "number",
+      typeof c.priceNaira === "number" &&
+      typeof c.recommendedVehicleType === "string",
   )
 }
 

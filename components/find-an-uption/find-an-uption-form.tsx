@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ChevronRight, MapPin } from "lucide-react"
+import { ChevronRight, LoaderCircle, MapPin } from "lucide-react"
 import { isRedirectError } from "next/dist/client/components/redirect-error"
 
 import { Checkbox } from "@/components/ui/checkbox"
@@ -27,7 +27,7 @@ import {
 import { type DeliveryQuoteRequest } from "@/lib/delivery-quotes"
 
 import { NIGERIAN_STATES } from "./nigerian-states"
-import { PACKAGE_WEIGHT_CLASSES, VEHICLE_TYPES } from "./package-options"
+import { PACKAGE_WEIGHT_CLASSES } from "./package-options"
 
 type PartyDetails = {
   name: string
@@ -52,11 +52,11 @@ function isValidEmail(email: string) {
 }
 
 function isPartyComplete(p: PartyDetails): boolean {
-  const phone = p.phone.trim().replace(/\s/g, "")
+  const phoneDigits = p.phone.replace(/\D/g, "")
   return (
     p.name.trim().length > 0 &&
     isValidEmail(p.email) &&
-    phone.length >= 7 &&
+    phoneDigits.length >= 11 &&
     p.address.trim().length > 0 &&
     p.state.trim().length > 0
   )
@@ -67,6 +67,24 @@ function isValidNairaValue(raw: string): boolean {
   if (!/^\d+$/.test(n)) return false
   const num = Number(n)
   return Number.isFinite(num) && num > 0
+}
+
+function addressesMatch(first: string, second: string): boolean {
+  const normalize = (address: string) =>
+    address
+      .normalize("NFKD")
+      .toLocaleLowerCase("en-NG")
+      .replace(/[^\p{L}\p{N}]/gu, "")
+
+  const normalizedFirst = normalize(first)
+  return normalizedFirst.length > 0 && normalizedFirst === normalize(second)
+}
+
+function matchNigerianState(value?: string): string | undefined {
+  if (!value) return undefined
+  const normalized = value.trim().toLocaleLowerCase("en-NG")
+  if (normalized.includes("federal capital") || normalized === "fct") return "FCT"
+  return NIGERIAN_STATES.find((state) => state.toLocaleLowerCase("en-NG") === normalized)
 }
 
 const PROGRESS_SEGMENTS = 3
@@ -88,14 +106,67 @@ function AddressField({
   label,
   value,
   onChange,
+  onLocationResolved,
   placeholder,
 }: {
   id: string
   label: string
   value: string
   onChange: (v: string) => void
+  onLocationResolved: (location: { address: string; state?: string }) => void
   placeholder: string
 }) {
+  const [showHint, setShowHint] = React.useState(true)
+  const [isLocating, setIsLocating] = React.useState(false)
+  const [locationError, setLocationError] = React.useState("")
+
+  React.useEffect(() => {
+    const timeout = window.setTimeout(() => setShowHint(false), 5_000)
+    return () => window.clearTimeout(timeout)
+  }, [])
+
+  async function useCurrentLocation() {
+    setLocationError("")
+    if (!navigator.geolocation) {
+      setLocationError("Your browser does not support location services.")
+      return
+    }
+
+    setIsLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const response = await fetch(
+            `/api/reverse-geocode?lat=${encodeURIComponent(coords.latitude)}&lon=${encodeURIComponent(coords.longitude)}`,
+            { cache: "no-store" },
+          )
+          const payload: unknown = await response.json()
+          if (!response.ok || !payload || typeof payload !== "object" || !("address" in payload) || typeof payload.address !== "string") {
+            throw new Error("We could not find an address for your current location.")
+          }
+          onLocationResolved({
+            address: payload.address,
+            state: "state" in payload && typeof payload.state === "string" ? payload.state : undefined,
+          })
+          setShowHint(false)
+        } catch (error) {
+          setLocationError(error instanceof Error ? error.message : "We could not look up your current location.")
+        } finally {
+          setIsLocating(false)
+        }
+      },
+      (error) => {
+        setIsLocating(false)
+        setLocationError(
+          error.code === error.PERMISSION_DENIED
+            ? "Location permission was denied. Please allow it and try again."
+            : "We could not get your current location. Please try again.",
+        )
+      },
+      { enableHighAccuracy: true, timeout: 12_000, maximumAge: 60_000 },
+    )
+  }
+
   return (
     <div className="space-y-2">
       <Label htmlFor={id} className="text-brand-primary">
@@ -110,11 +181,27 @@ function AddressField({
           autoComplete="street-address"
           className={cn(inputFieldClass, "pr-11")}
         />
-        <MapPin
-          className="pointer-events-none absolute right-3 top-1/2 size-5 -translate-y-1/2 text-brand-secondary"
-          aria-hidden
-        />
+        <button
+          type="button"
+          onClick={useCurrentLocation}
+          disabled={isLocating}
+          aria-label={`Use my current location for ${label.toLowerCase()}`}
+          aria-describedby={showHint ? `${id}-location-hint` : undefined}
+          className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-md text-brand-secondary transition-colors hover:bg-brand-secondary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary/40 disabled:cursor-wait disabled:opacity-60"
+        >
+          {isLocating ? <LoaderCircle className="size-5 animate-spin" aria-hidden /> : <MapPin className="size-5" aria-hidden />}
+        </button>
+        {showHint ? (
+          <span
+            id={`${id}-location-hint`}
+            role="tooltip"
+            className="absolute right-0 top-[calc(100%+0.45rem)] z-20 w-56 rounded-md bg-brand-primary px-3 py-2 text-xs font-medium leading-snug text-white shadow-lg"
+          >
+            Click this icon to use your current location.
+          </span>
+        ) : null}
       </div>
+      {locationError ? <p className="text-sm text-red-600" role="alert">{locationError}</p> : null}
     </div>
   )
 }
@@ -203,7 +290,9 @@ export function FindAnUptionForm() {
   const [sender, setSender] = React.useState<PartyDetails>(() => emptyParty())
   const [receiver, setReceiver] = React.useState<PartyDetails>(() => emptyParty())
   const [packageDescription, setPackageDescription] = React.useState("")
-  const [vehicleType, setVehicleType] = React.useState("")
+  // Vehicle capacity is selected by the quote engine from the parcel weight
+  // and each provider's declared fleet.
+  const vehicleType = "auto"
   const [weightClass, setWeightClass] = React.useState("")
   const [packageValueNaira, setPackageValueNaira] = React.useState("")
   const [additionalInstruction, setAdditionalInstruction] = React.useState("")
@@ -220,7 +309,6 @@ export function FindAnUptionForm() {
         setSender(d.sender)
         setReceiver(d.receiver)
         setPackageDescription(d.packageDescription)
-        setVehicleType(d.vehicleType)
         setWeightClass(d.weightClass)
         setPackageValueNaira(d.packageValueNaira)
         setAdditionalInstruction(d.additionalInstruction)
@@ -266,6 +354,10 @@ export function FindAnUptionForm() {
     setSender((s) => ({ ...s, ...patch }))
   const updateReceiver = (patch: Partial<PartyDetails>) =>
     setReceiver((r) => ({ ...r, ...patch }))
+  const applySenderLocation = (location: { address: string; state?: string }) =>
+    updateSender({ address: location.address, ...(matchNigerianState(location.state) ? { state: matchNigerianState(location.state) } : {}) })
+  const applyReceiverLocation = (location: { address: string; state?: string }) =>
+    updateReceiver({ address: location.address, ...(matchNigerianState(location.state) ? { state: matchNigerianState(location.state) } : {}) })
 
   const goNextFromStep1 = () => {
     if (senderSameAsReceiver) {
@@ -293,10 +385,14 @@ export function FindAnUptionForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (
-      !vehicleType ||
       !weightClass ||
       !isValidNairaValue(packageValueNaira)
     ) {
+      return
+    }
+
+    if (addressesMatch(sender.address, receiver.address)) {
+      setSubmitError("Pickup and delivery addresses must be different.")
       return
     }
 
@@ -333,7 +429,7 @@ export function FindAnUptionForm() {
       ? isPartyComplete(sender)
       : step === 2
         ? isPartyComplete(receiver)
-        : Boolean(vehicleType && weightClass && isValidNairaValue(packageValueNaira))
+        : Boolean(weightClass && isValidNairaValue(packageValueNaira))
 
   const ctaClassName = cn(
     "flex h-12 w-full items-center justify-center gap-1 rounded-lg px-6 font-poppins text-base font-semibold transition-colors",
@@ -408,6 +504,7 @@ export function FindAnUptionForm() {
               <Input
                 id="sender-phone"
                 type="tel"
+                inputMode="tel"
                 value={sender.phone}
                 onChange={(e) => updateSender({ phone: e.target.value })}
                 placeholder="Input active phone number"
@@ -420,6 +517,7 @@ export function FindAnUptionForm() {
               label="Pickup Address"
               value={sender.address}
               onChange={(v) => updateSender({ address: v })}
+              onLocationResolved={applySenderLocation}
               placeholder="Input pickup location"
             />
             <StateSelect
@@ -428,7 +526,7 @@ export function FindAnUptionForm() {
               value={sender.state}
               onChange={(v) => updateSender({ state: v })}
             />
-            <div className="flex items-center gap-2 pt-2">
+            <div className="hidden items-center gap-2 pt-2" aria-hidden="true">
               <Checkbox
                 id="same-as-receiver"
                 checked={senderSameAsReceiver}
@@ -481,6 +579,7 @@ export function FindAnUptionForm() {
               <Input
                 id="receiver-phone"
                 type="tel"
+                inputMode="tel"
                 value={receiver.phone}
                 onChange={(e) => updateReceiver({ phone: e.target.value })}
                 placeholder="Input active phone number"
@@ -493,6 +592,7 @@ export function FindAnUptionForm() {
               label="Delivery Address"
               value={receiver.address}
               onChange={(v) => updateReceiver({ address: v })}
+              onLocationResolved={applyReceiverLocation}
               placeholder="Input delivery location"
             />
             <StateSelect
@@ -524,14 +624,6 @@ export function FindAnUptionForm() {
               />
             </div>
             <PackageSelect
-              id="vehicle-type"
-              label="Vehicle type"
-              value={vehicleType}
-              onChange={setVehicleType}
-              placeholder="Select Vehicle"
-              options={VEHICLE_TYPES}
-            />
-            <PackageSelect
               id="package-weight"
               label="Package Weight Class (kg)"
               value={weightClass}
@@ -539,6 +631,10 @@ export function FindAnUptionForm() {
               placeholder="Select weight"
               options={PACKAGE_WEIGHT_CLASSES}
             />
+            <p className="text-sm text-brand-foreground/70">
+              We&apos;ll recommend a suitable vehicle based on your package weight
+              and each provider&apos;s available fleet.
+            </p>
             <div className="space-y-2">
               <Label htmlFor="package-value" className="text-brand-primary">
                 Package Value (Naira)

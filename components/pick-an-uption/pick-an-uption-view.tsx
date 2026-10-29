@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import { useFormState, useFormStatus } from "react-dom"
-import { ChevronRight } from "lucide-react"
+import Link from "next/link"
+import { ArrowLeft, ChevronRight } from "lucide-react"
 
 import { selectCourierAndCheckoutAction } from "@/app/actions/checkout-flow-actions"
 import type { DeliveryQuoteResponse } from "@/lib/delivery-quotes"
@@ -40,17 +41,31 @@ export function PickAnUptionView({
   const count = quote.couriers.length
 
   return (
-    <div className="mx-auto w-full max-w-lg space-y-6 md:space-y-8">
+    <div className="mx-auto w-full max-w-4xl space-y-6 md:space-y-8">
       <header className="text-center">
+        <div className="mb-4 flex justify-start">
+          <Link
+            href="/find-an-uption"
+            className="inline-flex items-center gap-2 rounded-md px-1 py-1 text-sm font-semibold text-brand-primary transition-colors hover:text-brand-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary focus-visible:ring-offset-2"
+          >
+            <ArrowLeft className="size-4" aria-hidden />
+            Back to details
+          </Link>
+        </div>
         <h1 className="font-heading text-3xl font-bold tracking-tight md:text-4xl">
           <span className="text-brand-secondary">Pick an </span>
           <span className="text-brand-primary">Uption</span>
         </h1>
         <p className="mt-3 text-base font-bold text-brand-foreground md:text-lg">
-          {count} Courier{count === 1 ? "" : "s"} found from your address
+          Showing the {count} best matching Courier{count === 1 ? "" : "s"}
         </p>
         <p className="mt-2 text-sm text-brand-foreground md:text-base">
-          Delivery Estimated time:{" "}
+          Delivery distance: {" "}
+          <span className="font-semibold text-brand-secondary">
+            {quote.distanceKm.toLocaleString("en-NG", { maximumFractionDigits: 1 })} km
+          </span>
+          <span aria-hidden> · </span>
+          Delivery estimated time:{" "}
           <span className="font-semibold text-brand-secondary">
             {quote.estimatedMinutes} minutes
           </span>
@@ -61,7 +76,7 @@ export function PickAnUptionView({
         <input type="hidden" name="courierId" value={selectedId ?? ""} />
 
         <div
-          className="space-y-4"
+          className="grid grid-cols-1 gap-4 md:grid-cols-2"
           role="radiogroup"
           aria-label="Choose a courier"
         >
