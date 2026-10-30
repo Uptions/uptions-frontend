@@ -2,14 +2,14 @@
 
 import { Circle, UploadCloud } from "lucide-react"
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { fetchBusinessMe, getBusinessAccessToken, setBusinessAccessToken } from "@/lib/business-auth"
-import { submitBusinessOnboarding } from "@/lib/business-api"
+import { submitBusinessOnboarding, uploadBusinessLogo } from "@/lib/business-api"
 import { buildBusinessOnboardingPayload } from "@/lib/business-onboarding-payload"
 import { saveBusinessSession } from "@/lib/business-session"
 import {
@@ -138,6 +138,8 @@ export default function BusinessSignUpFormPage() {
   const [operatingNote, setOperatingNote] = useState("")
 
   const [uploadedLogoName, setUploadedLogoName] = useState("")
+  const [uploadedLogoFile, setUploadedLogoFile] = useState<File | null>(null)
+  const logoInputRef = useRef<HTMLInputElement>(null)
   const [deliveryCategory, setDeliveryCategory] = useState<(typeof deliveryCategories)[number] | "">("")
   const [itemClass, setItemClass] = useState<(typeof itemClasses)[number] | "">("")
   const [hours, setHours] = useState<HoursState>(defaultHours)
@@ -261,7 +263,7 @@ export default function BusinessSignUpFormPage() {
           representativeRole.trim() &&
           organizationName.trim() &&
           businessEmail.trim() &&
-          businessPhone.trim() &&
+          businessPhone.replace(/\D/g, "").length >= 11 &&
           businessAddress.trim() &&
           cacOrNin.trim() &&
           yearsInBusiness.trim() &&
@@ -354,11 +356,27 @@ export default function BusinessSignUpFormPage() {
                   onChange={(event) => setBusinessEmail(event.target.value)}
                 />
                 <Input
+                  type="tel"
                   placeholder="Enter Official Business Phone Number"
                   className={inputClassName}
                   value={businessPhone}
-                  onChange={(event) => setBusinessPhone(event.target.value)}
+                  onChange={(event) =>
+                    setBusinessPhone(
+                      event.target.value
+                        .replace(/[^\d+]/g, "")
+                        .replace(/(?!^)\+/g, "")
+                        .slice(0, 16),
+                    )
+                  }
+                  inputMode="tel"
+                  pattern="\+?[0-9]*"
+                  maxLength={16}
+                  autoComplete="tel"
+                  aria-describedby="business-phone-help"
                 />
+                <p id="business-phone-help" className="-mt-2 text-xs text-brand-foreground/65">
+                  Use digits only, with an optional + at the beginning (minimum 11 digits).
+                </p>
                 <Input
                   placeholder="Enter Official Business Address"
                   className={inputClassName}
@@ -467,17 +485,33 @@ export default function BusinessSignUpFormPage() {
             {step === 1 ? (
               <div className="mt-8 space-y-5">
                 <div className="space-y-2">
-                  <Label className="text-xl font-semibold text-brand-primary">Business Details</Label>
-                  <Input
-                    placeholder="Upload Business Logo"
-                    className={inputClassName}
-                    value={uploadedLogoName}
-                    onChange={(event) => setUploadedLogoName(event.target.value)}
-                  />
+                  <Label className="text-xl font-semibold text-brand-primary">Upload business logo</Label>
                   <p className="text-xs text-brand-foreground">*Upload headshot if a solopreneur</p>
                 </div>
 
-                <div className="rounded-lg border border-dashed border-brand-secondary/60 bg-white/60 p-8 text-center">
+                <div
+                  className="rounded-lg border border-dashed border-brand-secondary/60 bg-white/60 p-8 text-center"
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    const [file] = Array.from(event.dataTransfer.files)
+                    if (file) {
+                      setUploadedLogoName(file.name)
+                      setUploadedLogoFile(file)
+                    }
+                  }}
+                >
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png"
+                    className="sr-only"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null
+                      setUploadedLogoName(file?.name ?? "")
+                      setUploadedLogoFile(file)
+                    }}
+                  />
                   <UploadCloud className="mx-auto size-12 text-brand-secondary" />
                   <p className="mt-3 text-sm text-brand-foreground">Drag and drop your file here</p>
                   <p className="mt-1 text-xs text-brand-foreground/60">
@@ -485,14 +519,18 @@ export default function BusinessSignUpFormPage() {
                   </p>
                   <button
                     type="button"
+                    onClick={() => logoInputRef.current?.click()}
                     className="mt-4 inline-flex h-8 items-center rounded-md bg-brand-secondary px-4 text-xs font-semibold text-brand-white"
                   >
                     Upload
                   </button>
+                  {uploadedLogoName ? (
+                    <p className="mt-3 text-xs font-medium text-brand-primary">Selected: {uploadedLogoName}</p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-3">
-                  <Input placeholder="Select a Delivery Category" className={inputClassName} />
+                  <Label className="text-base font-semibold text-brand-primary">Select a delivery category</Label>
                   <div className="flex flex-wrap gap-2">
                     {deliveryCategories.map((option, index) => (
                       <ChoicePill
@@ -675,6 +713,10 @@ export default function BusinessSignUpFormPage() {
                           if (hasInsurance !== "yes" && hasInsurance !== "no") {
                             throw new Error("Select whether you offer insurance")
                           }
+                          if (!uploadedLogoFile) {
+                            throw new Error("Please select your logo again before submitting")
+                          }
+                          const { key: uploadedLogoKey } = await uploadBusinessLogo(uploadedLogoFile)
                           const payload = buildBusinessOnboardingPayload({
                             representativeName,
                             representativeRole,
@@ -685,7 +727,7 @@ export default function BusinessSignUpFormPage() {
                             cacOrNin,
                             yearsInBusiness,
                             operatingHoursNote: operatingNote,
-                            uploadedLogoName,
+                            uploadedLogoName: uploadedLogoKey,
                             deliveryCategoryUi: deliveryCategory,
                             itemClass,
                             hours,

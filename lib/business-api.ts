@@ -68,6 +68,16 @@ export async function submitBusinessOnboarding(
   return parseJson<OnboardingResponse>(response)
 }
 
+export async function uploadBusinessLogo(file: File): Promise<{ key: string }> {
+  const body = new FormData()
+  body.append("file", file)
+  const response = await authFetch(apiUrl("/v1/business/uploads/logo"), {
+    method: "POST",
+    body,
+  })
+  return parseJson<{ key: string }>(response)
+}
+
 export type BusinessProfile = {
   _id?: string
   name?: string
