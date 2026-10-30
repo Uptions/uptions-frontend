@@ -1,6 +1,6 @@
 "use client"
 
-import { Eye, MapPin } from "lucide-react"
+import { Eye, EyeOff, MapPin } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
@@ -48,6 +48,8 @@ export default function BusinessSignUpPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirm, setConfirm] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -100,7 +102,11 @@ export default function BusinessSignUpPage() {
                   }
                   setSubmitting(true)
                   try {
-                    await registerBusiness(email.trim(), password)
+                    const registered = await registerBusiness(email.trim(), password)
+                    if (registered.verificationRequired) {
+                      router.push(`/business/auth/verify-email?email=${encodeURIComponent(registered.email)}`)
+                      return
+                    }
                     await loginBusiness(email.trim(), password)
                     clearBusinessSession()
                     const me = await fetchBusinessMe()
@@ -145,7 +151,7 @@ export default function BusinessSignUpPage() {
                 <div className="relative">
                   <Input
                     id="business-signup-password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="Enter Password"
                     className={cn(inputClassName, "pr-10")}
                     autoComplete="new-password"
@@ -154,10 +160,14 @@ export default function BusinessSignUpPage() {
                     required
                     minLength={8}
                   />
-                  <Eye
-                    className="pointer-events-none absolute right-3 top-1/2 size-5 -translate-y-1/2 text-brand-secondary"
-                    aria-hidden
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((visible) => !visible)}
+                    className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-md text-brand-secondary hover:bg-brand-secondary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary/40"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="size-5" aria-hidden /> : <Eye className="size-5" aria-hidden />}
+                  </button>
                 </div>
               </div>
 
@@ -168,7 +178,7 @@ export default function BusinessSignUpPage() {
                 <div className="relative">
                   <Input
                     id="business-signup-confirm"
-                    type="password"
+                    type={showConfirmPassword ? "text" : "password"}
                     placeholder="Enter Password"
                     className={cn(inputClassName, "pr-10")}
                     autoComplete="new-password"
@@ -177,10 +187,14 @@ export default function BusinessSignUpPage() {
                     required
                     minLength={8}
                   />
-                  <Eye
-                    className="pointer-events-none absolute right-3 top-1/2 size-5 -translate-y-1/2 text-brand-secondary"
-                    aria-hidden
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((visible) => !visible)}
+                    className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-md text-brand-secondary hover:bg-brand-secondary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary/40"
+                    aria-label={showConfirmPassword ? "Hide confirmation password" : "Show confirmation password"}
+                  >
+                    {showConfirmPassword ? <EyeOff className="size-5" aria-hidden /> : <Eye className="size-5" aria-hidden />}
+                  </button>
                 </div>
               </div>
 

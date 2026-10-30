@@ -2,14 +2,21 @@
 
 import { MapPin } from "lucide-react"
 import Link from "next/link"
+import { useState } from "react"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { requestBusinessPasswordReset } from "@/lib/business-auth"
 
 const inputClassName =
   "h-12 rounded-lg border-brand-secondary/70 bg-[#EEF2F6] text-brand-foreground placeholder:text-brand-foreground/50 focus-visible:border-brand-secondary focus-visible:ring-2 focus-visible:ring-brand-secondary/25"
 
 export default function BusinessForgotPasswordPage() {
+  const [email, setEmail] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
   return (
     <div
       className="relative min-h-svh w-full bg-transparent bg-[url('/layer.svg')] bg-top bg-no-repeat [background-size:100%_auto]"
@@ -48,7 +55,24 @@ export default function BusinessForgotPasswordPage() {
               to reset your password.
             </p>
 
-            <form className="mt-8 space-y-5">
+            <form
+              className="mt-8 space-y-5"
+              onSubmit={(event) => {
+                event.preventDefault()
+                void (async () => {
+                  setSubmitting(true)
+                  setError(null)
+                  try {
+                    await requestBusinessPasswordReset(email.trim())
+                    setSent(true)
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : "Unable to request a reset link")
+                  } finally {
+                    setSubmitting(false)
+                  }
+                })()
+              }}
+            >
               <div className="space-y-2">
                 <Label htmlFor="business-forgot-email" className="text-brand-foreground">
                   Email
@@ -59,14 +83,21 @@ export default function BusinessForgotPasswordPage() {
                   placeholder="Enter your email"
                   className={inputClassName}
                   autoComplete="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
                 />
               </div>
 
+              {sent ? <p className="text-sm text-emerald-700">If an account exists for that email, a reset link has been sent.</p> : null}
+              {error ? <p className="text-sm text-[#E11D48]" role="alert">{error}</p> : null}
+
               <button
-                type="button"
+                type="submit"
+                disabled={submitting}
                 className="inline-flex h-12 w-full items-center justify-center rounded-lg bg-brand-secondary px-6 font-poppins text-base font-semibold text-brand-white transition-colors hover:bg-brand-secondary/90"
               >
-                Send Reset Link
+                {submitting ? "Sending…" : "Send Reset Link"}
               </button>
             </form>
 

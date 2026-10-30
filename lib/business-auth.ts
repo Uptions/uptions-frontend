@@ -103,7 +103,7 @@ export async function authFetch(input: string, init?: RequestInit): Promise<Resp
 export async function registerBusiness(
   email: string,
   password: string,
-): Promise<{ id: string; email: string }> {
+): Promise<{ id: string; email: string; verificationRequired: boolean }> {
   const res = await fetch(apiUrl("/v1/auth/business/register"), {
     method: "POST",
     credentials: "include",
@@ -111,6 +111,42 @@ export async function registerBusiness(
     body: JSON.stringify({ email, password }),
   })
   return parseJsonOrThrow(res)
+}
+
+export async function verifyBusinessEmail(token: string): Promise<void> {
+  const res = await fetch(apiUrl("/v1/auth/business/verify-email"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  })
+  await parseJsonOrThrow(res)
+}
+
+export async function resendBusinessVerification(email: string): Promise<void> {
+  const res = await fetch(apiUrl("/v1/auth/business/resend-verification"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  })
+  await parseJsonOrThrow(res)
+}
+
+export async function requestBusinessPasswordReset(email: string): Promise<void> {
+  const res = await fetch(apiUrl("/v1/auth/business/forgot-password"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  })
+  await parseJsonOrThrow(res)
+}
+
+export async function resetBusinessPassword(token: string, password: string): Promise<void> {
+  const res = await fetch(apiUrl("/v1/auth/business/reset-password"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, password }),
+  })
+  await parseJsonOrThrow(res)
 }
 
 export async function loginBusiness(

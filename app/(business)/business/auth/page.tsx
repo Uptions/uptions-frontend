@@ -1,6 +1,6 @@
 "use client"
 
-import { Eye, MapPin } from "lucide-react"
+import { Eye, EyeOff, MapPin } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
@@ -47,6 +47,7 @@ export default function BusinessAuthPage() {
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -136,7 +137,7 @@ export default function BusinessAuthPage() {
                 <div className="relative">
                   <Input
                     id="business-password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="Enter Password"
                     className={cn(inputClassName, "pr-10")}
                     autoComplete="current-password"
@@ -144,17 +145,29 @@ export default function BusinessAuthPage() {
                     onChange={(event) => setPassword(event.target.value)}
                     required
                   />
-                  <Eye
-                    className="pointer-events-none absolute right-3 top-1/2 size-5 -translate-y-1/2 text-brand-secondary"
-                    aria-hidden
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((visible) => !visible)}
+                    className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-md text-brand-secondary hover:bg-brand-secondary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary/40"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="size-5" aria-hidden /> : <Eye className="size-5" aria-hidden />}
+                  </button>
                 </div>
               </div>
 
               {error ? (
-                <p className="text-sm text-[#E11D48]" role="alert">
-                  {error}
-                </p>
+                <div className="space-y-2 text-sm" role="alert">
+                  <p className="text-[#E11D48]">{error}</p>
+                  {error.toLowerCase().includes("verify your email") ? (
+                    <Link
+                      href={`/business/auth/verify-email?email=${encodeURIComponent(email.trim())}`}
+                      className="font-semibold text-brand-secondary hover:underline"
+                    >
+                      Resend verification email
+                    </Link>
+                  ) : null}
+                </div>
               ) : null}
 
               <button
