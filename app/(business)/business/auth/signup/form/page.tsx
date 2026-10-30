@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, Circle, Clock3, UploadCloud, X } from "lucide-react"
+import { Circle, UploadCloud } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -32,6 +32,15 @@ const itemClasses = [
   "All 3 classes",
 ] as const
 const chargeModes = ["Distance (per km)", "Weight (per kg)", "Distance + Weight"] as const
+const businessExperienceOptions = [
+  "0.5 years (6 months)",
+  "1 year",
+  "2 years",
+  "3 years",
+  "4 years",
+  "5 years",
+  "More than 5 years",
+] as const
 
 const weekDays = [
   { key: "sunday", short: "S" },
@@ -46,13 +55,20 @@ const weekDays = [
 type HoursState = Record<(typeof weekDays)[number]["key"], { from: string; to: string }>
 
 const defaultHours: HoursState = {
-  sunday: { from: "12:00", to: "12:00" },
-  monday: { from: "12:00", to: "12:00" },
-  tuesday: { from: "12:00", to: "12:00" },
-  wednesday: { from: "12:00", to: "12:00" },
-  thursday: { from: "12:00", to: "12:00" },
-  friday: { from: "12:00", to: "12:00" },
-  saturday: { from: "12:00", to: "12:00" },
+  sunday: { from: "", to: "" },
+  monday: { from: "", to: "" },
+  tuesday: { from: "", to: "" },
+  wednesday: { from: "", to: "" },
+  thursday: { from: "", to: "" },
+  friday: { from: "", to: "" },
+  saturday: { from: "", to: "" },
+}
+
+function formatOperatingHours(hours: HoursState) {
+  return weekDays
+    .filter((day) => hours[day.key].from && hours[day.key].to)
+    .map((day) => `${day.key.slice(0, 3)} ${hours[day.key].from}–${hours[day.key].to}`)
+    .join(", ")
 }
 
 function ChoicePill({
@@ -184,6 +200,10 @@ export default function BusinessSignUpFormPage() {
   }, [authGate])
 
   useEffect(() => {
+    setOperatingNote(formatOperatingHours(hours))
+  }, [hours])
+
+  useEffect(() => {
     if (authGate !== "ready") return
     saveBusinessSignUpFormDraft({
       v: 1,
@@ -245,14 +265,14 @@ export default function BusinessSignUpFormPage() {
           businessAddress.trim() &&
           cacOrNin.trim() &&
           yearsInBusiness.trim() &&
-          operatingNote.trim(),
+          weekDays.some((day) => hours[day.key].from && hours[day.key].to),
       ),
     [
       businessAddress,
       businessEmail,
       businessPhone,
       cacOrNin,
-      operatingNote,
+      hours,
       organizationName,
       representativeName,
       representativeRole,
@@ -261,7 +281,7 @@ export default function BusinessSignUpFormPage() {
   )
 
   const canContinueStep2 = useMemo(() => {
-    const hasHours = weekDays.every(
+    const hasHours = weekDays.some(
       (day) => hours[day.key].from.trim().length > 0 && hours[day.key].to.trim().length > 0,
     )
     return Boolean(uploadedLogoName && deliveryCategory && itemClass && hasHours)
@@ -351,18 +371,87 @@ export default function BusinessSignUpFormPage() {
                   value={cacOrNin}
                   onChange={(event) => setCacOrNin(event.target.value)}
                 />
-                <Input
-                  placeholder="How many years have you been in business?"
-                  className={inputClassName}
-                  value={yearsInBusiness}
-                  onChange={(event) => setYearsInBusiness(event.target.value)}
-                />
-                <Input
-                  placeholder="What are your Operating Hours ?"
-                  className={inputClassName}
-                  value={operatingNote}
-                  onChange={(event) => setOperatingNote(event.target.value)}
-                />
+                <div className="space-y-2">
+                  <Label htmlFor="years-in-business" className="text-sm font-semibold text-brand-primary">
+                    Years in business
+                  </Label>
+                  <select
+                    id="years-in-business"
+                    className={cn(inputClassName, "w-full px-3")}
+                    value={yearsInBusiness}
+                    onChange={(event) => setYearsInBusiness(event.target.value)}
+                  >
+                    <option value="" disabled>
+                      Select years in business
+                    </option>
+                    {businessExperienceOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-3 rounded-lg border border-brand-secondary/30 bg-[#f7fbff] p-4">
+                  <div>
+                    <Label className="text-sm font-semibold text-brand-primary">Operating hours</Label>
+                    <p className="mt-1 text-xs text-brand-foreground/65">
+                      Choose the days you operate, then set your opening and closing times.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {weekDays.map((day) => {
+                      const isOpen = Boolean(hours[day.key].from && hours[day.key].to)
+                      return (
+                        <div key={day.key} className="grid grid-cols-[88px_1fr_1fr] items-center gap-2">
+                          <button
+                            type="button"
+                            aria-pressed={isOpen}
+                            onClick={() =>
+                              setHours((current) => ({
+                                ...current,
+                                [day.key]: isOpen ? { from: "", to: "" } : { from: "08:00", to: "17:00" },
+                              }))
+                            }
+                            className={cn(
+                              "h-9 rounded-md border px-2 text-sm font-medium transition-colors",
+                              isOpen
+                                ? "border-brand-secondary bg-brand-secondary text-brand-white"
+                                : "border-brand-secondary/40 bg-white text-brand-primary hover:bg-[#e9f4ff]",
+                            )}
+                          >
+                            {day.key.slice(0, 3).replace(/^./, (letter) => letter.toUpperCase())}
+                          </button>
+                          <Input
+                            type="time"
+                            aria-label={`${day.key} opening time`}
+                            className={cn(inputClassName, "h-9 px-2 text-sm")}
+                            disabled={!isOpen}
+                            value={hours[day.key].from}
+                            onChange={(event) =>
+                              setHours((current) => ({
+                                ...current,
+                                [day.key]: { ...current[day.key], from: event.target.value },
+                              }))
+                            }
+                          />
+                          <Input
+                            type="time"
+                            aria-label={`${day.key} closing time`}
+                            className={cn(inputClassName, "h-9 px-2 text-sm")}
+                            disabled={!isOpen}
+                            value={hours[day.key].to}
+                            onChange={(event) =>
+                              setHours((current) => ({
+                                ...current,
+                                [day.key]: { ...current[day.key], to: event.target.value },
+                              }))
+                            }
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
 
                   <button
                     type="button"
@@ -432,42 +521,6 @@ export default function BusinessSignUpFormPage() {
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <Input placeholder="Input working hours" className={inputClassName} />
-                  <div className="space-y-2">
-                    {weekDays.map((day) => (
-                      <div key={day.key} className="flex items-center gap-3">
-                        <span className="inline-flex size-7 items-center justify-center rounded-full bg-brand-primary text-xs font-semibold text-brand-white">
-                          {day.short}
-                        </span>
-                        <Input
-                          className={cn(inputClassName, "h-9 w-24")}
-                          value={hours[day.key].from}
-                          onChange={(event) =>
-                            setHours((current) => ({
-                              ...current,
-                              [day.key]: { ...current[day.key], from: event.target.value },
-                            }))
-                          }
-                        />
-                        <span className="text-sm text-brand-foreground/70">-</span>
-                        <Input
-                          className={cn(inputClassName, "h-9 w-24")}
-                          value={hours[day.key].to}
-                          onChange={(event) =>
-                            setHours((current) => ({
-                              ...current,
-                              [day.key]: { ...current[day.key], to: event.target.value },
-                            }))
-                          }
-                        />
-                        <X className="size-4 text-brand-foreground/50" />
-                        <Clock3 className="size-4 text-brand-foreground/50" />
-                        <Check className="size-4 text-brand-foreground/50" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <button
