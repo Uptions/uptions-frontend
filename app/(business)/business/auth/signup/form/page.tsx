@@ -186,7 +186,7 @@ export default function BusinessSignUpFormPage() {
 
   const [chargeMode, setChargeMode] = useState<(typeof chargeModes)[number] | "">("")
   const [weightSensitive, setWeightSensitive] = useState<"yes" | "no" | "">("")
-  const [weightPricingTiers, setWeightPricingTiers] = useState<WeightPricingTier[]>([emptyWeightPricingTier])
+  const [weightPricingTiers, setWeightPricingTiers] = useState<WeightPricingTier[]>([emptyWeightPricingTier()])
   const [flatRatePerKm, setFlatRatePerKm] = useState("")
   const [hasInsurance, setHasInsurance] = useState<"yes" | "no" | "">("")
   const [showWeightGuide, setShowWeightGuide] = useState(false)
