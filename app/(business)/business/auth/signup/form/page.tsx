@@ -1,8 +1,9 @@
 "use client"
 
-import { Circle, UploadCloud } from "lucide-react"
+import { Circle, UploadCloud, X } from "lucide-react"
 import Link from "next/link"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 
 import { Checkbox } from "@/components/ui/checkbox"
@@ -23,6 +24,14 @@ const inputClassName =
   "h-11 rounded-md border-brand-secondary/60 bg-[#EEF2F6] text-brand-foreground placeholder:text-brand-foreground/50 focus-visible:border-brand-secondary focus-visible:ring-2 focus-visible:ring-brand-secondary/25"
 
 type Step = 0 | 1 | 2
+type WeightPricingTier = { id: string; minKg: string; maxKg: string; pricePerKg: string }
+
+const emptyWeightPricingTier = (): WeightPricingTier => ({
+  id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+  minKg: "",
+  maxKg: "",
+  pricePerKg: "",
+})
 
 const deliveryCategories = ["Within a state", "State to state", "Both"] as const
 const itemClasses = [
@@ -31,6 +40,7 @@ const itemClasses = [
   "Large (Furniture, appliances, equipment)",
   "All 3 classes",
 ] as const
+const allItemClassesOption = "All 3 classes"
 const chargeModes = ["Distance (per km)", "Weight (per kg)", "Distance + Weight"] as const
 const businessExperienceOptions = [
   "0.5 years (6 months)",
@@ -40,6 +50,29 @@ const businessExperienceOptions = [
   "4 years",
   "5 years",
   "More than 5 years",
+] as const
+
+const weightGuide = [
+  {
+    range: "0.1 – 2 kg",
+    examples: "Documents, clothing, small accessories",
+    vehicle: "Bicycle, bike, or motorcycle",
+  },
+  {
+    range: "2.1 – 5 kg",
+    examples: "Shoes, small electronics, boxed parcels",
+    vehicle: "Motorcycle, tricycle, or car",
+  },
+  {
+    range: "5.1 – 10 kg",
+    examples: "Medium electronics and compact appliances",
+    vehicle: "Tricycle, car, or van",
+  },
+  {
+    range: "10.1 kg and above",
+    examples: "Furniture, large appliances, and bulk items",
+    vehicle: "Van or truck",
+  },
 ] as const
 
 const weekDays = [
@@ -76,18 +109,21 @@ function ChoicePill({
   active,
   onClick,
   tag,
+  disabled = false,
 }: {
   label: string
   active: boolean
   onClick: () => void
   tag: string
+  disabled?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={cn(
-        "inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm transition-colors",
+        "inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45",
         active
           ? "border-brand-secondary bg-[#d7eaff] text-brand-primary"
           : "border-brand-secondary/40 bg-[#cfe3f7]/70 text-brand-foreground hover:bg-[#d7eaff]",
@@ -125,6 +161,8 @@ function Progress({ step }: { step: Step }) {
 export default function BusinessSignUpFormPage() {
   const router = useRouter()
   const [authGate, setAuthGate] = useState<"pending" | "ready" | "redirect">("pending")
+  const [draftAccountEmail, setDraftAccountEmail] = useState("")
+  const [draftHydrated, setDraftHydrated] = useState(false)
   const [step, setStep] = useState<Step>(0)
 
   const [representativeName, setRepresentativeName] = useState("")
@@ -138,18 +176,20 @@ export default function BusinessSignUpFormPage() {
   const [operatingNote, setOperatingNote] = useState("")
 
   const [uploadedLogoName, setUploadedLogoName] = useState("")
-  const [uploadedLogoFile, setUploadedLogoFile] = useState<File | null>(null)
+  const [uploadedLogoKey, setUploadedLogoKey] = useState("")
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [logoUploadError, setLogoUploadError] = useState<string | null>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
   const [deliveryCategory, setDeliveryCategory] = useState<(typeof deliveryCategories)[number] | "">("")
-  const [itemClass, setItemClass] = useState<(typeof itemClasses)[number] | "">("")
+  const [selectedItemClasses, setSelectedItemClasses] = useState<Array<(typeof itemClasses)[number]>>([])
   const [hours, setHours] = useState<HoursState>(defaultHours)
 
   const [chargeMode, setChargeMode] = useState<(typeof chargeModes)[number] | "">("")
   const [weightSensitive, setWeightSensitive] = useState<"yes" | "no" | "">("")
-  const [weightPriceMin, setWeightPriceMin] = useState("")
-  const [weightPriceMax, setWeightPriceMax] = useState("")
+  const [weightPricingTiers, setWeightPricingTiers] = useState<WeightPricingTier[]>([emptyWeightPricingTier])
   const [flatRatePerKm, setFlatRatePerKm] = useState("")
   const [hasInsurance, setHasInsurance] = useState<"yes" | "no" | "">("")
+  const [showWeightGuide, setShowWeightGuide] = useState(false)
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -162,7 +202,13 @@ export default function BusinessSignUpFormPage() {
     }
     void fetchBusinessMe()
       .then((me) => {
-        setBusinessEmail((prev) => (prev.trim() ? prev : me.email))
+        if (me.companyId) {
+          router.replace("/business/dashboard")
+          setAuthGate("redirect")
+          return
+        }
+        setBusinessEmail(me.email)
+        setDraftAccountEmail(me.email)
         setAuthGate("ready")
       })
       .catch(() => {
@@ -172,43 +218,62 @@ export default function BusinessSignUpFormPage() {
   }, [router])
 
   useEffect(() => {
-    if (authGate !== "ready") return
-    queueMicrotask(() => {
-      const draft = loadBusinessSignUpFormDraft()
-      if (!draft) return
+    if (authGate !== "ready" || !draftAccountEmail || draftHydrated) return
+    const draft = loadBusinessSignUpFormDraft(draftAccountEmail)
+    if (draft) {
 
       setStep(draft.step)
       setRepresentativeName(draft.representativeName)
       setRepresentativeRole(draft.representativeRole)
       setOrganizationName(draft.organizationName)
-      setBusinessEmail(draft.businessEmail)
+      setBusinessEmail(draftAccountEmail)
       setBusinessPhone(draft.businessPhone)
       setBusinessAddress(draft.businessAddress)
       setCacOrNin(draft.cacOrNin)
       setYearsInBusiness(draft.yearsInBusiness)
       setOperatingNote(draft.operatingNote)
       setUploadedLogoName(draft.uploadedLogoName)
+      setUploadedLogoKey(draft.uploadedLogoKey)
       setDeliveryCategory(draft.deliveryCategory as (typeof deliveryCategories)[number] | "")
-      setItemClass(draft.itemClass as (typeof itemClasses)[number] | "")
+      setSelectedItemClasses(
+        draft.itemClasses
+          .filter((itemClass): itemClass is (typeof itemClasses)[number] =>
+            itemClasses.includes(itemClass as (typeof itemClasses)[number]),
+          )
+          .slice(0, 2),
+      )
       setHours(draft.hours)
       setChargeMode(draft.chargeMode as (typeof chargeModes)[number] | "")
       setWeightSensitive(draft.weightSensitive)
-      setWeightPriceMin(draft.weightPriceMin)
-      setWeightPriceMax(draft.weightPriceMax)
+      const restoredWeightPricingTiers = (draft.weightPricingTiers ?? [])
+        .filter(
+          (tier): tier is WeightPricingTier =>
+            Boolean(tier) &&
+            typeof tier.minKg === "string" &&
+            typeof tier.maxKg === "string" &&
+            typeof tier.pricePerKg === "string",
+        )
+        .map((tier) => ({ ...tier, id: tier.id || emptyWeightPricingTier().id }))
+      setWeightPricingTiers(
+        restoredWeightPricingTiers.length
+          ? restoredWeightPricingTiers
+          : [{ ...emptyWeightPricingTier(), minKg: draft.weightPriceMin ?? "", maxKg: draft.weightPriceMax ?? "" }],
+      )
       setFlatRatePerKm(draft.flatRatePerKm)
       setHasInsurance(draft.hasInsurance)
       setAcceptedTerms(draft.acceptedTerms)
-    })
-  }, [authGate])
+    }
+    setDraftHydrated(true)
+  }, [authGate, draftAccountEmail, draftHydrated])
 
   useEffect(() => {
     setOperatingNote(formatOperatingHours(hours))
   }, [hours])
 
   useEffect(() => {
-    if (authGate !== "ready") return
-    saveBusinessSignUpFormDraft({
-      v: 1,
+    if (authGate !== "ready" || !draftAccountEmail || !draftHydrated) return
+    const draft = {
+      v: 1 as const,
       step,
       representativeName,
       representativeRole,
@@ -220,17 +285,24 @@ export default function BusinessSignUpFormPage() {
       yearsInBusiness,
       operatingNote,
       uploadedLogoName,
+      uploadedLogoKey,
       deliveryCategory,
-      itemClass,
+      itemClasses: selectedItemClasses,
       hours,
       chargeMode,
       weightSensitive,
-      weightPriceMin,
-      weightPriceMax,
+      weightPricingTiers,
       flatRatePerKm,
       hasInsurance,
       acceptedTerms,
-    })
+    }
+    const saveDraft = () => saveBusinessSignUpFormDraft(draftAccountEmail, draft)
+    const timer = window.setTimeout(saveDraft, 750)
+    window.addEventListener("pagehide", saveDraft)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener("pagehide", saveDraft)
+    }
   }, [
     acceptedTerms,
     authGate,
@@ -239,19 +311,21 @@ export default function BusinessSignUpFormPage() {
     businessPhone,
     cacOrNin,
     chargeMode,
+    draftAccountEmail,
+    draftHydrated,
     deliveryCategory,
     flatRatePerKm,
     hasInsurance,
     hours,
-    itemClass,
+    selectedItemClasses,
     operatingNote,
     organizationName,
     representativeName,
     representativeRole,
     step,
     uploadedLogoName,
-    weightPriceMax,
-    weightPriceMin,
+    uploadedLogoKey,
+    weightPricingTiers,
     weightSensitive,
     yearsInBusiness,
   ])
@@ -286,14 +360,40 @@ export default function BusinessSignUpFormPage() {
     const hasHours = weekDays.some(
       (day) => hours[day.key].from.trim().length > 0 && hours[day.key].to.trim().length > 0,
     )
-    return Boolean(uploadedLogoName && deliveryCategory && itemClass && hasHours)
-  }, [deliveryCategory, hours, itemClass, uploadedLogoName])
+    return Boolean(uploadedLogoKey && !uploadingLogo && deliveryCategory && selectedItemClasses.length && hasHours)
+  }, [deliveryCategory, hours, selectedItemClasses.length, uploadedLogoKey, uploadingLogo])
+
+  const uploadSelectedLogo = useCallback(async (file: File | null) => {
+    setLogoUploadError(null)
+    if (!file) {
+      setUploadedLogoName("")
+      setUploadedLogoKey("")
+      return
+    }
+    setUploadedLogoName(file.name)
+    setUploadedLogoKey("")
+    setUploadingLogo(true)
+    try {
+      const { key } = await uploadBusinessLogo(file)
+      setUploadedLogoKey(key)
+    } catch (error) {
+      setLogoUploadError(error instanceof Error ? error.message : "Could not upload the logo")
+    } finally {
+      setUploadingLogo(false)
+    }
+  }, [])
 
   const canSubmit = useMemo(() => {
-    const hasWeightRange =
-      weightSensitive === "no" || (weightPriceMin.trim().length > 0 && weightPriceMax.trim().length > 0)
-    return Boolean(chargeMode && weightSensitive && hasWeightRange && flatRatePerKm.trim() && hasInsurance && acceptedTerms)
-  }, [acceptedTerms, chargeMode, flatRatePerKm, hasInsurance, weightPriceMax, weightPriceMin, weightSensitive])
+    const needsWeightPricing = weightSensitive === "yes" || chargeMode !== "Distance (per km)"
+    const hasValidWeightTiers = !needsWeightPricing || weightPricingTiers.length > 0 && weightPricingTiers.every(
+      (tier) =>
+        typeof tier?.minKg === "string" &&
+        typeof tier?.maxKg === "string" &&
+        typeof tier?.pricePerKg === "string" &&
+        tier.minKg.trim() && tier.maxKg.trim() && tier.pricePerKg.trim(),
+    )
+    return Boolean(chargeMode && weightSensitive && hasValidWeightTiers && flatRatePerKm.trim() && hasInsurance && acceptedTerms)
+  }, [acceptedTerms, chargeMode, flatRatePerKm, hasInsurance, weightPricingTiers, weightSensitive])
 
   if (authGate !== "ready") {
     return (
@@ -328,6 +428,9 @@ export default function BusinessSignUpFormPage() {
 
           <section className="mt-8 w-full max-w-2xl rounded-xl border border-[#9dc5e9] bg-white/70 p-5 shadow-[0_6px_30px_-20px_rgba(0,27,108,0.35)] backdrop-blur-sm md:p-8">
             <h1 className="text-center text-4xl font-bold text-brand-primary">Uptions Form</h1>
+            <p className="mt-2 text-center text-sm text-brand-foreground/65">
+              Your progress is saved automatically.
+            </p>
 
             {step === 0 ? (
               <div className="mt-8 space-y-4">
@@ -495,10 +598,7 @@ export default function BusinessSignUpFormPage() {
                   onDrop={(event) => {
                     event.preventDefault()
                     const [file] = Array.from(event.dataTransfer.files)
-                    if (file) {
-                      setUploadedLogoName(file.name)
-                      setUploadedLogoFile(file)
-                    }
+                    void uploadSelectedLogo(file ?? null)
                   }}
                 >
                   <input
@@ -508,8 +608,7 @@ export default function BusinessSignUpFormPage() {
                     className="sr-only"
                     onChange={(event) => {
                       const file = event.target.files?.[0] ?? null
-                      setUploadedLogoName(file?.name ?? "")
-                      setUploadedLogoFile(file)
+                      void uploadSelectedLogo(file)
                     }}
                   />
                   <UploadCloud className="mx-auto size-12 text-brand-secondary" />
@@ -524,9 +623,11 @@ export default function BusinessSignUpFormPage() {
                   >
                     Upload
                   </button>
-                  {uploadedLogoName ? (
-                    <p className="mt-3 text-xs font-medium text-brand-primary">Selected: {uploadedLogoName}</p>
+                  {uploadingLogo ? <p className="mt-3 text-xs font-medium text-brand-primary">Uploading logo…</p> : null}
+                  {uploadedLogoName && uploadedLogoKey ? (
+                    <p className="mt-3 text-xs font-medium text-brand-primary">Saved: {uploadedLogoName}</p>
                   ) : null}
+                  {logoUploadError ? <p className="mt-3 text-xs font-medium text-[#E11D48]">{logoUploadError}</p> : null}
                 </div>
 
                 <div className="space-y-3">
@@ -545,15 +646,38 @@ export default function BusinessSignUpFormPage() {
                 </div>
 
                 <div className="space-y-3">
-                  <Input placeholder="What type of items do you deliver?" className={inputClassName} />
+                  <Label className="text-base font-semibold text-brand-primary">What type of items do you deliver?</Label>
+                  <p className="text-xs text-brand-foreground/65">
+                    Select up to two item classes, or choose All 3 classes.
+                  </p>
                   <div className="flex flex-col gap-2">
                     {itemClasses.map((option, index) => (
                       <ChoicePill
                         key={option}
                         tag={String.fromCharCode(65 + index)}
                         label={option}
-                        active={itemClass === option}
-                        onClick={() => setItemClass(option)}
+                        active={selectedItemClasses.includes(option)}
+                        disabled={
+                          !selectedItemClasses.includes(option) &&
+                          option !== allItemClassesOption &&
+                          !selectedItemClasses.includes(allItemClassesOption) &&
+                          selectedItemClasses.length >= 2
+                        }
+                        onClick={() =>
+                          setSelectedItemClasses((current) =>
+                            option === allItemClassesOption
+                              ? current.includes(option)
+                                ? []
+                                : [option]
+                              : current.includes(option)
+                                ? current.filter((itemClass) => itemClass !== option)
+                                : current.includes(allItemClassesOption)
+                                  ? [option]
+                                  : current.length < 2
+                                    ? [...current, option]
+                                    : current,
+                          )
+                        }
                       />
                     ))}
                   </div>
@@ -593,7 +717,7 @@ export default function BusinessSignUpFormPage() {
                 </div>
 
                 <div className="space-y-3">
-                  <Input placeholder="How do you charge?" className={inputClassName} />
+                  <Label className="text-base font-semibold text-brand-primary">How do you charge?</Label>
                   <div className="flex flex-col gap-2">
                     {chargeModes.map((option, index) => (
                       <ChoicePill
@@ -608,10 +732,9 @@ export default function BusinessSignUpFormPage() {
                 </div>
 
                 <div className="space-y-3">
-                  <Input
-                    placeholder="Does the weight or size of an item affect influence your price?"
-                    className={inputClassName}
-                  />
+                  <Label className="text-base font-semibold text-brand-primary">
+                    Does the weight or size of an item affect your price?
+                  </Label>
                   <div className="flex gap-2">
                     <ChoicePill
                       tag="A"
@@ -630,37 +753,82 @@ export default function BusinessSignUpFormPage() {
 
                 <div className="rounded-md border border-brand-secondary/40 bg-[#eaf3ff] p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm text-brand-foreground">Provide your weight price per kg</span>
-                    <button type="button" className="text-sm font-semibold text-brand-secondary hover:underline">
+                    <span className="text-sm font-semibold text-brand-primary">Set weight bands and prices</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowWeightGuide(true)}
+                      className="text-sm font-semibold text-brand-secondary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary/40"
+                    >
                       see weight guide
                     </button>
                   </div>
-                  <div className="mt-3 flex items-center gap-2">
-                    <Input
-                      className={cn(inputClassName, "h-9 w-24")}
-                      placeholder="1kg"
-                      value={weightPriceMin}
-                      onChange={(event) => setWeightPriceMin(event.target.value)}
-                    />
-                    <span className="text-brand-foreground">to</span>
-                    <Input
-                      className={cn(inputClassName, "h-9 w-24")}
-                      placeholder="2kg"
-                      value={weightPriceMax}
-                      onChange={(event) => setWeightPriceMax(event.target.value)}
-                    />
+                  <div className="mt-3 space-y-2">
+                    {weightPricingTiers.map((tier, index) => (
+                      <div key={tier.id} className="flex flex-wrap items-center gap-2">
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          inputMode="decimal"
+                          aria-label={`Weight band ${index + 1} minimum kilograms`}
+                          className={cn(inputClassName, "h-9 w-28")}
+                          placeholder="From kg"
+                          value={tier.minKg}
+                          onChange={(event) => setWeightPricingTiers((tiers) => tiers.map((item) => item.id === tier.id ? { ...item, minKg: event.target.value } : item))}
+                        />
+                        <span className="text-sm text-brand-foreground">to</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          inputMode="decimal"
+                          aria-label={`Weight band ${index + 1} maximum kilograms`}
+                          className={cn(inputClassName, "h-9 w-28")}
+                          placeholder="To kg"
+                          value={tier.maxKg}
+                          onChange={(event) => setWeightPricingTiers((tiers) => tiers.map((item) => item.id === tier.id ? { ...item, maxKg: event.target.value } : item))}
+                        />
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          inputMode="decimal"
+                          aria-label={`Weight band ${index + 1} price per kilogram`}
+                          className={cn(inputClassName, "h-9 w-28")}
+                          placeholder="₦ / kg"
+                          value={tier.pricePerKg}
+                          onChange={(event) => setWeightPricingTiers((tiers) => tiers.map((item) => item.id === tier.id ? { ...item, pricePerKg: event.target.value } : item))}
+                        />
+                        {weightPricingTiers.length > 1 ? (
+                          <button type="button" onClick={() => setWeightPricingTiers((tiers) => tiers.filter((item) => item.id !== tier.id))} className="text-sm font-semibold text-red-600 hover:underline">
+                            Remove
+                          </button>
+                        ) : null}
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => setWeightPricingTiers((tiers) => [...tiers, emptyWeightPricingTier()])} className="text-sm font-semibold text-brand-secondary hover:underline">
+                      + Add another weight band
+                    </button>
                   </div>
                 </div>
 
-                <Input
-                  placeholder="What is your flat rate charge per kilometer (km)"
-                  className={inputClassName}
-                  value={flatRatePerKm}
-                  onChange={(event) => setFlatRatePerKm(event.target.value)}
-                />
+                <div className="space-y-2">
+                  <Label className="text-base font-semibold text-brand-primary">
+                    What is your flat rate charge per kilometer (km)?
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    inputMode="decimal"
+                    placeholder="Enter amount"
+                    className={inputClassName}
+                    value={flatRatePerKm}
+                    onChange={(event) => setFlatRatePerKm(event.target.value)}
+                  />
+                </div>
 
                 <div className="space-y-3">
-                  <Input placeholder="Do you cover item insurance" className={inputClassName} />
+                  <Label className="text-base font-semibold text-brand-primary">Do you cover item insurance?</Label>
                   <div className="flex gap-2">
                     <ChoicePill
                       tag="A"
@@ -681,6 +849,8 @@ export default function BusinessSignUpFormPage() {
                   <Checkbox
                     checked={acceptedTerms}
                     onCheckedChange={(value) => setAcceptedTerms(Boolean(value))}
+                    aria-label="Agree to the terms and conditions"
+                    className="size-5 border-2 border-brand-secondary bg-white text-brand-white shadow-sm data-[state=checked]:border-brand-secondary data-[state=checked]:bg-brand-secondary"
                   />
                   I agree to the terms and conditions
                 </label>
@@ -713,10 +883,9 @@ export default function BusinessSignUpFormPage() {
                           if (hasInsurance !== "yes" && hasInsurance !== "no") {
                             throw new Error("Select whether you offer insurance")
                           }
-                          if (!uploadedLogoFile) {
-                            throw new Error("Please select your logo again before submitting")
+                          if (!uploadedLogoKey) {
+                            throw new Error("Please wait for your logo upload to finish")
                           }
-                          const { key: uploadedLogoKey } = await uploadBusinessLogo(uploadedLogoFile)
                           const payload = buildBusinessOnboardingPayload({
                             representativeName,
                             representativeRole,
@@ -729,12 +898,11 @@ export default function BusinessSignUpFormPage() {
                             operatingHoursNote: operatingNote,
                             uploadedLogoName: uploadedLogoKey,
                             deliveryCategoryUi: deliveryCategory,
-                            itemClass,
+                            itemClasses: selectedItemClasses,
                             hours,
                             chargeModeUi: chargeMode,
                             weightSensitive: weightSensitive as "yes" | "no",
-                            weightPriceMin,
-                            weightPriceMax,
+                            weightPricingTiers,
                             flatRatePerKm,
                             hasInsurance: hasInsurance as "yes" | "no",
                             acceptedTerms,
@@ -748,7 +916,7 @@ export default function BusinessSignUpFormPage() {
                             companyId: res.companyId,
                             businessName: organizationName.trim(),
                           })
-                          clearBusinessSignUpFormDraft()
+                          clearBusinessSignUpFormDraft(draftAccountEmail)
                           router.push("/business/dashboard?welcome=1")
                         } catch (err) {
                           setSubmitError(err instanceof Error ? err.message : "Submission failed")
@@ -765,6 +933,64 @@ export default function BusinessSignUpFormPage() {
                 </div>
               </div>
             ) : null}
+
+            {showWeightGuide && typeof document !== "undefined" ? createPortal(
+              <div
+                className="fixed inset-0 z-50 grid place-items-center bg-brand-foreground/45 p-4"
+                role="presentation"
+                onMouseDown={() => setShowWeightGuide(false)}
+              >
+                <section
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="weight-guide-title"
+                  className="w-full max-w-xl rounded-2xl bg-white p-5 shadow-2xl sm:p-6"
+                  onMouseDown={(event) => event.stopPropagation()}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 id="weight-guide-title" className="text-2xl font-bold text-brand-primary">
+                        Delivery weight guide
+                      </h2>
+                      <p className="mt-1 text-sm text-brand-foreground/70">
+                        Use these ranges as a practical guide when setting your per-kilogram price.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowWeightGuide(false)}
+                      className="grid size-9 shrink-0 place-items-center rounded-md text-brand-foreground/70 hover:bg-brand-secondary/10 hover:text-brand-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary/40"
+                      aria-label="Close weight guide"
+                    >
+                      <X className="size-5" aria-hidden />
+                    </button>
+                  </div>
+
+                  <div className="mt-5 overflow-hidden rounded-lg border border-brand-secondary/25">
+                    {weightGuide.map((entry) => (
+                      <div
+                        key={entry.range}
+                        className="grid gap-1 border-b border-brand-secondary/15 p-3 last:border-b-0 sm:grid-cols-[110px_1fr] sm:gap-x-4"
+                      >
+                        <span className="font-semibold text-brand-primary">{entry.range}</span>
+                        <div className="text-sm text-brand-foreground">
+                          <p>{entry.examples}</p>
+                          <p className="mt-1 text-brand-foreground/65">Suggested vehicle: {entry.vehicle}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowWeightGuide(false)}
+                    className="mt-5 inline-flex h-10 w-full items-center justify-center rounded-lg bg-brand-secondary px-4 font-semibold text-brand-white hover:bg-brand-secondary/90"
+                  >
+                    Got it
+                  </button>
+                </section>
+              </div>
+            , document.body) : null}
 
             <Progress step={step} />
           </section>

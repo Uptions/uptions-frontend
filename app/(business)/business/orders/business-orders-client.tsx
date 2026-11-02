@@ -1,8 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
+import { useCallback, useEffect, useState } from "react"
 
 import { BusinessShell } from "@/components/business/business-shell"
 import { BusinessNoSession } from "@/components/business/business-no-session"
@@ -33,13 +33,13 @@ function StatCard({ title, value }: { title: string; value: string }) {
 }
 
 export function BusinessOrdersClient() {
-  const router = useRouter()
   const searchParams = useSearchParams()
-  const activeTab = useMemo((): OrderTab => {
+  const initialTab = (): OrderTab => {
     const t = searchParams.get("tab")
     if (t === "new" || t === "pending" || t === "completed") return t
     return "pending"
-  }, [searchParams])
+  }
+  const [activeTab, setActiveTab] = useState<OrderTab>(initialTab)
 
   const { ready, authenticated, companyId } = useBusinessSession()
   const [overview, setOverview] = useState<BusinessOverview | null>(null)
@@ -114,13 +114,15 @@ export function BusinessOrdersClient() {
       </div>
 
       <div className="mt-6">
-        <div className="mb-2 flex items-center gap-8 border-b border-brand-foreground/15 pb-2 text-sm font-semibold text-brand-secondary">
+        <div role="tablist" aria-label="Orders" className="mb-2 flex items-center gap-8 border-b border-brand-foreground/15 text-sm font-semibold text-brand-secondary">
           {tabLabels.map((tab) => (
             <button
               key={tab.key}
               type="button"
-              onClick={() => router.replace(`/business/orders?tab=${tab.key}`)}
-              className={activeTab === tab.key ? "text-brand-foreground" : ""}
+              role="tab"
+              aria-selected={activeTab === tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={activeTab === tab.key ? "border-b-2 border-brand-primary pb-2 text-brand-foreground" : "border-b-2 border-transparent pb-2"}
             >
               {tab.label}
             </button>

@@ -38,12 +38,13 @@ export type BusinessOnboardingPayload = {
   operatingHoursNote: string
   logoUrl?: string
   serviceCoverage: "within_state" | "state_to_state" | "both"
-  itemClassLabel: string
+  itemClasses: Array<"small" | "medium" | "large" | "all">
   workingHours: Record<string, { from: string; to: string }>
   chargeMode: "distance_per_km" | "weight_per_kg" | "distance_and_weight"
   weightSensitive: "yes" | "no"
   weightPriceTierMinLabel?: string
   weightPriceTierMaxLabel?: string
+  weightPricingTiers?: Array<{ minKg: number; maxKg: number; pricePerKg: number }>
   flatRatePerKm: number
   offersInsurance: boolean
   insuranceCoverageNaira?: number
@@ -105,6 +106,7 @@ export async function getBusinessProfile(companyId: string): Promise<BusinessPro
 export async function patchBusinessProfile(
   companyId: string,
   body: Partial<{
+    name: string
     representativeName: string
     representativeRole: string
     businessEmail: string
@@ -138,6 +140,19 @@ export async function patchBusinessAvailability(
     body: JSON.stringify({ available }),
   })
   return parseJson(response)
+}
+
+export type BusinessNotification = {
+  id: string
+  title: string
+  message: string
+  createdAt: string
+  unread: boolean
+}
+
+export async function getBusinessNotifications(): Promise<BusinessNotification[]> {
+  const response = await authFetch(apiUrl("/v1/business/notifications"))
+  return parseJson<BusinessNotification[]>(response)
 }
 
 export type BusinessOverview = {

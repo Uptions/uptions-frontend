@@ -19,6 +19,14 @@ import {
 } from "@/lib/business-api"
 import { useBusinessSession } from "@/hooks/use-business-session"
 
+type OrderTab = "new" | "pending" | "completed"
+
+const orderTabs: Array<{ key: OrderTab; label: string; empty: string }> = [
+  { key: "new", label: "New Orders", empty: "No new orders yet." },
+  { key: "pending", label: "Pending Orders", empty: "No pending orders yet." },
+  { key: "completed", label: "Completed Orders", empty: "No completed orders yet." },
+]
+
 function StatCard({ title, value }: { title: string; value: string }) {
   return (
     <div className="rounded-lg border border-brand-foreground/15 bg-white/75 p-4">
@@ -37,20 +45,24 @@ export function BusinessDashboardClient() {
   const [profile, setProfile] = useState<BusinessProfile | null>(null)
   const [overview, setOverview] = useState<BusinessOverview | null>(null)
   const [orders, setOrders] = useState<BusinessOrderRow[]>([])
+  const [activeOrderTab, setActiveOrderTab] = useState<OrderTab>("new")
+  const [loadingOrders, setLoadingOrders] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [availability, setAvailability] = useState(true)
   const [togglingAvailability, setTogglingAvailability] = useState(false)
+  const [showConfirmationInfo, setShowConfirmationInfo] = useState(false)
 
   const displayName = profile?.name?.trim() || businessName || "your business"
 
   const loadData = useCallback(async () => {
     if (!companyId) return
     setLoadError(null)
+    setLoadingOrders(true)
     try {
       const [p, o, list] = await Promise.all([
         getBusinessProfile(companyId),
         getBusinessOverview(companyId),
-        getBusinessOrders(companyId, "new"),
+        getBusinessOrders(companyId, activeOrderTab),
       ])
       setProfile(p)
       setOverview(o)
@@ -60,8 +72,10 @@ export function BusinessDashboardClient() {
       }
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Failed to load dashboard")
+    } finally {
+      setLoadingOrders(false)
     }
-  }, [companyId])
+  }, [activeOrderTab, companyId])
 
   useEffect(() => {
     if (!ready || !companyId) return
@@ -74,10 +88,10 @@ export function BusinessDashboardClient() {
 
   const headerExtra =
     pendingReview ? (
-      <p className="inline-flex items-center gap-2 text-sm font-medium text-[#E11D48] md:text-base">
+      <button type="button" onClick={() => setShowConfirmationInfo(true)} className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-[#E11D48] md:text-base">
         <AlertCircle className="size-5 shrink-0" />
         Awaiting confirmation
-      </p>
+      </button>
     ) : null
 
   if (!ready) {
@@ -97,7 +111,7 @@ export function BusinessDashboardClient() {
   }
 
   return (
-    <BusinessShell activeNav="home" headerExtra={headerExtra}>
+    <BusinessShell activeNav="home" headerExtra={headerExtra} avatarLabel={displayName}>
       {loadError ? (
         <p className="mt-4 text-sm text-[#E11D48]" role="alert">
           {loadError}
@@ -138,7 +152,7 @@ export function BusinessDashboardClient() {
                 }
               })()
             }}
-            className={`h-7 w-14 rounded-full p-1 ${availability ? "bg-[#12A150]" : "bg-brand-foreground/40"}`}
+            className={`h-7 w-14 rounded-full p-1 disabled:cursor-not-allowed disabled:opacity-55 ${availability ? "bg-[#12A150]" : "bg-brand-foreground/40"}`}
             aria-label="Availability toggle"
           >
             <span
@@ -164,19 +178,26 @@ export function BusinessDashboardClient() {
       </div>
 
       <div className="mt-6">
-        <div className="mb-2 flex items-center gap-8 border-b border-brand-foreground/15 pb-2 text-sm font-semibold text-brand-secondary">
-          <span className="text-brand-foreground">New Orders</span>
-          <Link href="/business/orders" className="hover:underline">
-            Pending Orders
-          </Link>
-          <Link href="/business/orders?tab=completed" className="hover:underline">
-            Completed Orders
-          </Link>
+        <div role="tablist" aria-label="Dashboard orders" className="mb-2 flex items-center gap-8 border-b border-brand-foreground/15 text-sm font-semibold text-brand-secondary">
+          {orderTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={activeOrderTab === tab.key}
+              onClick={() => setActiveOrderTab(tab.key)}
+              className={`border-b-2 px-0 pb-2 transition-colors hover:text-brand-primary ${activeOrderTab === tab.key ? "border-brand-primary text-brand-foreground" : "border-transparent"}`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        <div className="space-y-2">
-          {orders.length === 0 ? (
-            <p className="py-6 text-center text-sm text-brand-secondary">No new orders yet.</p>
+        <div role="tabpanel" className="space-y-2">
+          {loadingOrders ? (
+            <p className="py-6 text-center text-sm text-brand-secondary">Loading orders…</p>
+          ) : orders.length === 0 ? (
+            <p className="py-6 text-center text-sm text-brand-secondary">{orderTabs.find((tab) => tab.key === activeOrderTab)?.empty}</p>
           ) : (
             orders.map((order) => (
               <div
@@ -224,6 +245,15 @@ export function BusinessDashboardClient() {
             </div>
           </div>
         </>
+      ) : null}
+      {showConfirmationInfo ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-brand-foreground/45 p-4" onMouseDown={() => setShowConfirmationInfo(false)}>
+          <section role="dialog" aria-modal="true" aria-labelledby="confirmation-info-title" className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+            <h2 id="confirmation-info-title" className="text-xl font-bold text-brand-primary">We are confirming your information</h2>
+            <p className="mt-3 text-brand-foreground">Please bear with us while our team reviews your business details. This should not take more than 6 to 16 hours, and we will notify you as soon as your account is confirmed.</p>
+            <button type="button" onClick={() => setShowConfirmationInfo(false)} className="mt-5 inline-flex h-10 w-full items-center justify-center rounded-lg bg-brand-secondary font-semibold text-white">Got it</button>
+          </section>
+        </div>
       ) : null}
     </BusinessShell>
   )

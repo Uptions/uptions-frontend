@@ -14,10 +14,11 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ReactNode, useState } from "react"
+import { ReactNode, useEffect, useRef, useState } from "react"
 
 import { logoutBusiness } from "@/lib/business-auth"
 import { clearBusinessSession } from "@/lib/business-session"
+import { getBusinessNotifications, type BusinessNotification } from "@/lib/business-api"
 import { cn } from "@/lib/utils"
 
 type NavKey = "home" | "orders" | "order-pool" | "wallet" | "account"
@@ -27,6 +28,7 @@ type BusinessShellProps = {
   children: ReactNode
   /** Shown next to the notification / avatar cluster (e.g. onboarding status). */
   headerExtra?: ReactNode
+  avatarLabel?: string
 }
 
 const navItems: Array<{
@@ -42,9 +44,30 @@ const navItems: Array<{
   { key: "account", label: "Account", href: "/business/account", icon: UserRound },
 ]
 
-export function BusinessShell({ activeNav, children, headerExtra }: BusinessShellProps) {
+export function BusinessShell({ activeNav, children, headerExtra, avatarLabel }: BusinessShellProps) {
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [notifications, setNotifications] = useState<BusinessNotification[]>([])
+  const [notificationsLoading, setNotificationsLoading] = useState(false)
+  const notificationsRef = useRef<HTMLDivElement>(null)
+  const avatarInitial = (avatarLabel?.trim().charAt(0) || "B").toUpperCase()
+
+  useEffect(() => {
+    if (!notificationsOpen) return
+    const closeOnOutsidePointer = (event: MouseEvent) => {
+      if (!notificationsRef.current?.contains(event.target as Node)) setNotificationsOpen(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setNotificationsOpen(false)
+    }
+    document.addEventListener("mousedown", closeOnOutsidePointer)
+    document.addEventListener("keydown", closeOnEscape)
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsidePointer)
+      document.removeEventListener("keydown", closeOnEscape)
+    }
+  }, [notificationsOpen])
 
   return (
     <div
@@ -157,15 +180,43 @@ export function BusinessShell({ activeNav, children, headerExtra }: BusinessShel
             <div className="min-w-0 flex-1" />
             <div className="flex flex-wrap items-center justify-end gap-4">
               {headerExtra}
-              <button
-                type="button"
-                className="inline-flex size-9 items-center justify-center rounded-lg border border-brand-foreground/15 bg-white/80 text-brand-foreground"
-                aria-label="Notifications"
-              >
-                <Bell className="size-4" />
-              </button>
+              <div ref={notificationsRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !notificationsOpen
+                    setNotificationsOpen(next)
+                    if (!next) return
+                    setNotificationsLoading(true)
+                    void getBusinessNotifications()
+                      .then(setNotifications)
+                      .catch(() => setNotifications([]))
+                      .finally(() => setNotificationsLoading(false))
+                  }}
+                  className="inline-flex size-9 items-center justify-center rounded-lg border border-brand-foreground/15 bg-white/80 text-brand-foreground hover:bg-brand-secondary/10"
+                  aria-label="Notifications"
+                  aria-expanded={notificationsOpen}
+                >
+                  <Bell className="size-4" />
+                </button>
+                {notificationsOpen ? (
+                  <div className="absolute right-0 top-11 z-50 w-80 rounded-xl border border-brand-foreground/15 bg-white p-3 shadow-xl">
+                    <p className="px-1 text-sm font-semibold text-brand-primary">Notifications</p>
+                    <div className="mt-2 max-h-72 space-y-2 overflow-y-auto">
+                      {notificationsLoading ? <p className="px-1 py-3 text-sm text-brand-foreground/65">Loading…</p> : null}
+                      {!notificationsLoading && notifications.length === 0 ? <p className="px-1 py-3 text-sm text-brand-foreground/65">You&apos;re all caught up.</p> : null}
+                      {notifications.map((notification) => (
+                        <div key={notification.id} className="rounded-lg bg-[#f5f9ff] p-3 text-sm">
+                          <p className="font-semibold text-brand-primary">{notification.title}</p>
+                          <p className="mt-1 text-brand-foreground/75">{notification.message}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
               <span className="inline-flex size-9 items-center justify-center rounded-full bg-[#f0d0b3] text-sm font-semibold text-brand-foreground">
-                K
+                {avatarInitial}
               </span>
             </div>
           </header>
